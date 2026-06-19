@@ -8,7 +8,6 @@ on:
 env:
   REGISTRY: jeemzuregistry.azurecr.io
   IMAGE_NAME: jeemzu-api
-  AZURE_WEBAPP_NAME: jeemzu
 
 jobs:
   build-and-deploy:
@@ -33,17 +32,10 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
       - name: Notify frontend of API changes
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.FRONTEND_DISPATCH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/Jeemzu/jeemzu.frontend/dispatches \
+            https://api.github.com/repos/Jeemzu/jeemzu.me/dispatches \
             -d '{"event_type":"api-types-update"}'
