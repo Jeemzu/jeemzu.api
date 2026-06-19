@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6ED03A19-7755-4D97-B5C8-9076A76D1D0F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JeemzuApi", "src\JeemzuApi\JeemzuApi.csproj", "{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C3EF0CB8-2E8D-483D-8696-287AD6BD0F60} = {6ED03A19-7755-4D97-B5C8-9076A76D1D0F}
+	EndGlobalSection
+EndGlobal

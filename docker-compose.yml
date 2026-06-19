@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jeemzu_postgres
+    environment:
+      POSTGRES_USER: jeemzu
+      POSTGRES_PASSWORD: jeemzu_dev_password
+      POSTGRES_DB: jeemzu_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - jeemzu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jeemzu -d jeemzu_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  jeemzu_pgdata:
