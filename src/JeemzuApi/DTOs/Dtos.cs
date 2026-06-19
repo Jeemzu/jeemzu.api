@@ -72,3 +72,28 @@ public class UserResponse
     /// </summary>
     public Dictionary<string, int> HighScores { get; set; } = [];
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+public class LoginRequest
+{
+    [Required]
+    public string Username { get; set; } = string.Empty;
+
+    [Required]
+    public string Password { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Returned from POST /api/auth/login and POST /api/auth/refresh.
+/// The refresh token itself is set as an httpOnly cookie, not in this body.
+/// </summary>
+public class TokenResponse
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public string TokenType { get; set; } = "Bearer";
+
+    /// <summary>Seconds until the access token expires.</summary>
+    public int ExpiresIn { get; set; }
+    public string Role { get; set; } = string.Empty;
+}

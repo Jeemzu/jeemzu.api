@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,6 +33,15 @@ public class AppDbContext : DbContext
             entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
             // Unique index so no two players can share a username
             entity.HasIndex(u => u.Username).IsUnique();
+        });
+
+        // RefreshToken configuration
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Token).IsRequired().HasMaxLength(256);
+            entity.Property(r => r.Username).IsRequired().HasMaxLength(50);
+            entity.HasIndex(r => r.Token).IsUnique();
         });
     }
 }

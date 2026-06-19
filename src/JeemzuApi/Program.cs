@@ -1,6 +1,10 @@
 using JeemzuApi.Data;
 using JeemzuApi.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +17,27 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "Jeemzu API", Version = "v1" });
+
+    // Allow sending JWT bearer tokens from the Swagger UI
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your JWT access token."
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 // EF Core — Npgsql (PostgreSQL)
@@ -28,6 +53,30 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Application services — Scoped so they share the DbContext per request
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// JWT authentication
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "jeemzu-api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "jeemzu-frontend";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // Health checks — includes a DB connectivity check via Npgsql
 builder.Services.AddHealthChecks()
@@ -44,7 +93,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:5173"   // Vite default port
             )
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();   // Required for httpOnly refresh token cookie
     });
 });
 
@@ -64,6 +114,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("JeemzuFrontend");
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Lightweight health endpoint — useful for Azure App Service health probes
