@@ -88,8 +88,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("JeemzuFrontend", policy =>
     {
         policy.WithOrigins(
-                "https://jeemzu.com",
-                "https://www.jeemzu.com",
+                "https://jeemzu.me",
+                "https://www.jeemzu.me",
                 "http://localhost:5173"   // Vite default port
             )
             .AllowAnyHeader()
