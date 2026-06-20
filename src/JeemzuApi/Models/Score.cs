@@ -12,6 +12,10 @@ public class Score
 
     public string Username { get; set; } = string.Empty;
 
+    /// <summary>FK to the User who submitted this score. Null for legacy/guest scores.</summary>
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
+
     /// <summary>Named ScoreValue to avoid conflicting with the Score class name.</summary>
     public int ScoreValue { get; set; }
 

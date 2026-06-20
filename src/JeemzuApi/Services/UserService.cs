@@ -14,32 +14,16 @@ public class UserService : IUserService
         _db = db;
     }
 
-    public async Task<(UserResponse User, bool WasCreated)> UpsertUserAsync(UpdateUserRequest request)
+    public async Task<UserResponse> UpdatePreferencesAsync(string username, UpdateUserRequest request)
     {
-        var existing = await _db.Users
-            .FirstOrDefaultAsync(u => u.Username == request.Username);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username)
+            ?? throw new InvalidOperationException($"User '{username}' not found.");
 
-        bool wasCreated;
-
-        if (existing is null)
-        {
-            existing = new User
-            {
-                Username = request.Username,
-                OptedIn = request.OptedIn,
-            };
-            _db.Users.Add(existing);
-            wasCreated = true;
-        }
-        else
-        {
-            existing.OptedIn = request.OptedIn;
-            existing.UpdatedAt = DateTimeOffset.UtcNow;
-            wasCreated = false;
-        }
-
+        user.OptedIn = request.OptedIn;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
-        return (await BuildUserResponseAsync(existing), wasCreated);
+
+        return await BuildUserResponseAsync(user);
     }
 
     public async Task<UserResponse?> GetUserAsync(string username)

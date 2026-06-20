@@ -42,6 +42,46 @@ public class AuthService : IAuthService
         return await IssueTokensAsync(adminUsername, "Admin", response);
     }
 
+    public async Task<(TokenResponse Token, bool WasCreated)> RegisterUserAsync(
+        RegisterRequest request, HttpResponse response)
+    {
+        var existing = await _db.Users
+            .FirstOrDefaultAsync(u => u.Username == request.Username);
+
+        if (existing is not null)
+        {
+            // Username taken — return 409 signal to caller
+            throw new InvalidOperationException("USERNAME_TAKEN");
+        }
+
+        var user = new JeemzuApi.Models.User
+        {
+            Username = request.Username,
+            OptedIn = request.OptedIn,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
+        };
+
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        var token = await IssueTokensAsync(user.Username, "User", response);
+        return (token, true);
+    }
+
+    public async Task<TokenResponse?> LoginUserAsync(LoginRequest request, HttpResponse response)
+    {
+        var user = await _db.Users
+            .FirstOrDefaultAsync(u => u.Username == request.Username);
+
+        if (user is null || user.PasswordHash is null)
+            return null;
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            return null;
+
+        return await IssueTokensAsync(user.Username, "User", response);
+    }
+
     public async Task<TokenResponse?> RefreshAsync(string refreshToken, HttpResponse response)
     {
         var stored = await _db.RefreshTokens

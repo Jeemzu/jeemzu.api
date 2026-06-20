@@ -4,6 +4,6 @@ namespace JeemzuApi.Services;
 
 public interface IScoreService
 {
-    Task<ScoreResponse> SaveScoreAsync(SubmitScoreRequest request);
+    Task<ScoreResponse> SaveScoreAsync(SubmitScoreRequest request, string username);
     Task<IEnumerable<ScoreResponse>> GetLeaderboardAsync(string gameId, int limit);
 }
