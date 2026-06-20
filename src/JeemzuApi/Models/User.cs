@@ -10,6 +10,9 @@ public class User
     /// <summary>Whether the player has opted into global leaderboards.</summary>
     public bool OptedIn { get; set; }
 
+    /// <summary>Role for authorization. Valid values: "User", "Admin". Default: "User".</summary>
+    public string Role { get; set; } = "User";
+
     /// <summary>BCrypt hash of the user's password. Null for legacy/guest accounts.</summary>
     public string? PasswordHash { get; set; }
 

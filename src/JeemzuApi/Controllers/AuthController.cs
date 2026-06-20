@@ -16,20 +16,6 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    // POST /api/auth/login
-    [HttpPost("login")]
-    [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
-    {
-        var result = await _authService.LoginAsync(request, Response);
-
-        if (result is null)
-            return Unauthorized(new { message = "Invalid credentials." });
-
-        return Ok(result);
-    }
-
     // POST /api/auth/refresh
     // Reads the httpOnly refreshToken cookie — no body needed
     [HttpPost("refresh")]

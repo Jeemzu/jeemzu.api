@@ -25,23 +25,6 @@ public class AuthService : IAuthService
         _config = config;
     }
 
-    public async Task<TokenResponse?> LoginAsync(LoginRequest request, HttpResponse response)
-    {
-        var adminUsername = _config["Admin:Username"];
-        var adminPasswordHash = _config["Admin:PasswordHash"];
-
-        if (adminUsername is null || adminPasswordHash is null)
-            throw new InvalidOperationException("Admin credentials are not configured.");
-
-        if (!string.Equals(request.Username, adminUsername, StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, adminPasswordHash))
-            return null;
-
-        return await IssueTokensAsync(adminUsername, "Admin", response);
-    }
-
     public async Task<(TokenResponse Token, bool WasCreated)> RegisterUserAsync(
         RegisterRequest request, HttpResponse response)
     {
@@ -79,7 +62,8 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
 
-        return await IssueTokensAsync(user.Username, "User", response);
+        // Role comes from the database — set it to "Admin" in the DB to promote a user
+        return await IssueTokensAsync(user.Username, user.Role, response);
     }
 
     public async Task<TokenResponse?> RefreshAsync(string refreshToken, HttpResponse response)
