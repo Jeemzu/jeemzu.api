@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using JeemzuApi.DTOs;
 using JeemzuApi.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JeemzuApi.Controllers;
@@ -15,20 +17,20 @@ public class ScoresController : ControllerBase
         _scoreService = scoreService;
     }
 
-    // POST /api/scores
-    // Body: { gameId, username, score, timestamp }
+    // POST /api/scores — requires authentication
     [HttpPost]
+    [Authorize]
     [ProducesResponseType(typeof(ScoreResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Submit([FromBody] SubmitScoreRequest request)
     {
-        // [ApiController] handles model validation automatically and returns 400
-        // if required fields are missing or constraints are violated.
-        var result = await _scoreService.SaveScoreAsync(request);
+        var username = User.FindFirstValue(ClaimTypes.Name)!;
+        var result = await _scoreService.SaveScoreAsync(request, username);
         return CreatedAtAction(nameof(GetLeaderboard), new { gameId = result.GameId }, result);
     }
 
-    // GET /api/scores/{gameId}?limit=10
+    // GET /api/scores/{gameId}?limit=10 — public
     [HttpGet("{gameId}")]
     [ProducesResponseType(typeof(IEnumerable<ScoreResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLeaderboard(

@@ -6,18 +6,14 @@ namespace JeemzuApi.DTOs;
 
 /// <summary>
 /// Request body for POST /api/scores.
-/// Shape matches what gameApi.ts sends:
-///   { gameId, username, score, timestamp }
+/// Username is NOT accepted from the client — it is taken from the authenticated
+/// user's JWT claim to prevent score spoofing.
 /// </summary>
 public class SubmitScoreRequest
 {
     [Required]
     [MaxLength(100)]
     public string GameId { get; set; } = string.Empty;
-
-    [Required]
-    [MaxLength(50)]
-    public string Username { get; set; } = string.Empty;
 
     [Range(0, int.MaxValue)]
     public int Score { get; set; }
@@ -43,14 +39,24 @@ public class ScoreResponse
 
 /// <summary>
 /// Request body for POST /api/users.
-/// Shape matches what gameApi.ts sends:
-///   { username, optedIn }
+/// Username is taken from the JWT claim — only OptedIn is accepted from the client.
 /// </summary>
 public class UpdateUserRequest
+{
+    public bool OptedIn { get; set; }
+}
+
+/// <summary>Request body for POST /api/users/register.</summary>
+public class RegisterRequest
 {
     [Required]
     [MaxLength(50)]
     public string Username { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(100)]
+    public string Password { get; set; } = string.Empty;
 
     public bool OptedIn { get; set; }
 }

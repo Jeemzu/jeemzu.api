@@ -24,6 +24,12 @@ public class AppDbContext : DbContext
             entity.Property(s => s.ScoreValue).IsRequired();
             // Index for fast leaderboard queries: filter by GameId, order by ScoreValue DESC
             entity.HasIndex(s => new { s.GameId, s.ScoreValue });
+            // Optional FK to User — nullable to support guest/legacy scores
+            entity.HasOne(s => s.User)
+                  .WithMany()
+                  .HasForeignKey(s => s.UserId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // User configuration

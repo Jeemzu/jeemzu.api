@@ -25,21 +25,45 @@ public class AuthService : IAuthService
         _config = config;
     }
 
-    public async Task<TokenResponse?> LoginAsync(LoginRequest request, HttpResponse response)
+    public async Task<(TokenResponse Token, bool WasCreated)> RegisterUserAsync(
+        RegisterRequest request, HttpResponse response)
     {
-        var adminUsername = _config["Admin:Username"];
-        var adminPasswordHash = _config["Admin:PasswordHash"];
+        var existing = await _db.Users
+            .FirstOrDefaultAsync(u => u.Username == request.Username);
 
-        if (adminUsername is null || adminPasswordHash is null)
-            throw new InvalidOperationException("Admin credentials are not configured.");
+        if (existing is not null)
+        {
+            // Username taken — return 409 signal to caller
+            throw new InvalidOperationException("USERNAME_TAKEN");
+        }
 
-        if (!string.Equals(request.Username, adminUsername, StringComparison.OrdinalIgnoreCase))
+        var user = new JeemzuApi.Models.User
+        {
+            Username = request.Username,
+            OptedIn = request.OptedIn,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
+        };
+
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        var token = await IssueTokensAsync(user.Username, "User", response);
+        return (token, true);
+    }
+
+    public async Task<TokenResponse?> LoginUserAsync(LoginRequest request, HttpResponse response)
+    {
+        var user = await _db.Users
+            .FirstOrDefaultAsync(u => u.Username == request.Username);
+
+        if (user is null || user.PasswordHash is null)
             return null;
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, adminPasswordHash))
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
 
-        return await IssueTokensAsync(adminUsername, "Admin", response);
+        // Role comes from the database — set it to "Admin" in the DB to promote a user
+        return await IssueTokensAsync(user.Username, user.Role, response);
     }
 
     public async Task<TokenResponse?> RefreshAsync(string refreshToken, HttpResponse response)

@@ -14,12 +14,15 @@ public class ScoreService : IScoreService
         _db = db;
     }
 
-    public async Task<ScoreResponse> SaveScoreAsync(SubmitScoreRequest request)
+    public async Task<ScoreResponse> SaveScoreAsync(SubmitScoreRequest request, string username)
     {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+
         var score = new Score
         {
             GameId = request.GameId.ToLowerInvariant(),
-            Username = request.Username,
+            Username = username,
+            UserId = user?.Id,
             ScoreValue = request.Score,
             Timestamp = request.Timestamp,
         };
