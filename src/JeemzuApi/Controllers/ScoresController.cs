@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using JeemzuApi.Data;
 using JeemzuApi.DTOs;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace JeemzuApi.Controllers;
 
@@ -11,10 +13,12 @@ namespace JeemzuApi.Controllers;
 public class ScoresController : ControllerBase
 {
     private readonly IScoreService _scoreService;
+    private readonly AppDbContext _db;
 
-    public ScoresController(IScoreService scoreService)
+    public ScoresController(IScoreService scoreService, AppDbContext db)
     {
         _scoreService = scoreService;
+        _db = db;
     }
 
     // POST /api/scores — requires authentication
@@ -39,5 +43,29 @@ public class ScoresController : ControllerBase
     {
         var scores = await _scoreService.GetLeaderboardAsync(gameId, limit);
         return Ok(scores);
+    }
+
+    // GET /api/scores/{gameId}/summary — public, but returns personalBest when authenticated
+    [HttpGet("{gameId}/summary")]
+    [ProducesResponseType(typeof(GameSummaryResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetGameSummary([FromRoute] string gameId)
+    {
+        Guid? userId = null;
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim is not null && Guid.TryParse(userIdClaim, out var parsed))
+            userId = parsed;
+
+        // Fall back to username lookup if NameIdentifier claim isn't present
+        if (userId is null)
+        {
+            var username = User.FindFirstValue(ClaimTypes.Name);
+            if (username is not null)
+            {
+                userId = (await _db.Users.FirstOrDefaultAsync(u => u.Username == username))?.Id;
+            }
+        }
+
+        var summary = await _scoreService.GetGameSummaryAsync(gameId, userId);
+        return Ok(summary);
     }
 }
