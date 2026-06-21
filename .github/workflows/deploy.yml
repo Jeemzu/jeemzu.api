@@ -2,7 +2,7 @@ name: Build and deploy container
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 env:

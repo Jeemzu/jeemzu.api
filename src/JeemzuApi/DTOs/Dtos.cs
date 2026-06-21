@@ -23,7 +23,7 @@ public class SubmitScoreRequest
 }
 
 /// <summary>
-/// Response shape for GET /api/scores/{gameId}.
+/// Returned from GET /api/scores/{gameId}.
 /// Must match the TypeScript GameHighScore type:
 ///   { gameId: string, username: string, score: number, timestamp: number }
 /// </summary>
@@ -33,6 +33,17 @@ public class ScoreResponse
     public string Username { get; set; } = string.Empty;
     public int Score { get; set; }
     public long Timestamp { get; set; }
+}
+
+/// <summary>
+/// Returned from GET /api/scores/{gameId}/summary.
+/// Provides all-time record and the requesting user's personal best in one call.
+/// PersonalBest is null when the request is unauthenticated.
+/// </summary>
+public class GameSummaryResponse
+{
+    public ScoreResponse? AllTimeRecord { get; set; }
+    public int? PersonalBest { get; set; }
 }
 
 // ── Users ────────────────────────────────────────────────────────────────────
