@@ -2,8 +2,11 @@ using JeemzuApi.Data;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -48,12 +51,37 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, o => o.UseVector()));
 
 // Application services — Scoped so they share the DbContext per request
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// ── Semantic Kernel + OpenAI ─────────────────────────────────────────────────
+// The Kernel and the LLM/embedding service instances are singletons: they hold
+// no per-request state and the underlying HTTP clients are designed to be reused.
+var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
+    ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured. Set it via: dotnet user-secrets set \"OpenAI:ApiKey\" \"<key>\"");
+var chatModel = builder.Configuration["OpenAI:ChatModel"] ?? "gpt-4o-mini";
+var embeddingModel = builder.Configuration["OpenAI:EmbeddingModel"] ?? "text-embedding-3-small";
+
+#pragma warning disable SKEXP0010 // AddOpenAIEmbeddingGenerator is experimental in SK 1.x but stable in practice
+var kernel = Kernel.CreateBuilder()
+    .AddOpenAIChatCompletion(chatModel, openAiApiKey)
+    .AddOpenAIEmbeddingGenerator(embeddingModel, openAiApiKey)
+    .Build();
+#pragma warning restore SKEXP0010
+
+builder.Services.AddSingleton(kernel);
+builder.Services.AddSingleton(kernel.Services.GetRequiredService<IChatCompletionService>());
+builder.Services.AddSingleton(kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>());
+
+// RAG services — Scoped so they share the DbContext per request
+builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
+builder.Services.AddScoped<IVectorStoreService, VectorStoreService>();
+builder.Services.AddScoped<IIngestionService, IngestionService>();
+builder.Services.AddScoped<IChatService, ChatService>();
 
 // JWT authentication
 var jwtSecret = builder.Configuration["Jwt:Secret"]

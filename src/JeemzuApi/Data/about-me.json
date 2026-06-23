@@ -1,0 +1,200 @@
+{
+    "personal": {
+        "name": "James Friedenberg",
+        "title": "Software Engineer — Full-Stack & Platform Systems",
+        "summary": "Software Engineer with experience building scalable live-event systems, developer tooling, client/server performance infrastructure, and modern web applications at Microsoft. Directly supported millions of players, large-scale live events, and creator ecosystems. Currently seeking Forward Deployed Engineering and full-stack software engineering roles.",
+        "location": "Albany, New York",
+        "contact": {
+            "email": "jamesfriedenberg@gmail.com",
+            "linkedin": "https://www.linkedin.com/in/james-friedenberg-664643105/",
+            "github": "github.com/jeemzu",
+            "website": "jeemzu.me"
+        }
+    },
+    "skills": {
+        "languages": [
+            "TypeScript",
+            "JavaScript",
+            "C#",
+            "C++",
+            "Java",
+            "Python"
+        ],
+        "frontend": [
+            "React",
+            "Angular",
+            "TailwindCSS",
+            "Zod",
+            "Zustand"
+        ],
+        "backend": [
+            ".NET 8",
+            "ASP.NET Core",
+            "Node.js",
+            "REST API Design",
+            "Entity Framework Core",
+            "JWT Authentication",
+            "PostgreSQL"
+        ],
+        "cloud": [
+            "Azure App Services",
+            "Azure PostgreSQL",
+            "Azure Application Insights",
+            "Azure VMs",
+            "CI/CD Pipelines",
+            "Git",
+            "Docker"
+        ],
+        "testing": [
+            "Playwright",
+            "Selenium",
+            "React Testing Library",
+            "Jest",
+            "Postman",
+            "Swagger"
+        ],
+        "ai": [
+            "OpenAI API",
+            "Semantic Kernel",
+            "Retrieval-Augmented Generation",
+            "pgvector",
+            "Vector Databases",
+            "GitHub Copilot",
+            "Large Language Models",
+            "Generative AI"
+        ]
+    },
+    "experience": [
+        {
+            "company": "Microsoft",
+            "role": "Software Engineer",
+            "period": "March 2022 - June 2026",
+            "description": "Full-stack software engineer on the Minecraft web and platform team, building live-event systems, developer tooling, and creator-facing infrastructure for Minecraft: Bedrock Edition.",
+            "achievements": [
+                "Co-engineered Minecraft: Bedrock Edition's first automated multiplayer performance testing framework, increasing player-per-server capacity from 10 to 80 and reducing infrastructure requirements for a 25,000-player live event from approximately 2,500 to 313 Azure VMs",
+                "Developed foundational gameplay and event systems including Minecraft's first official in-game cutscene system for the Minecraft Legends 2023 promotional live event, reaching over 3 million players",
+                "Rebuilt Minecraft live events management tooling as a React web application, integrating it into the Auger content pipeline to enable distribution to third-party creators and streamline deployment",
+                "Designed and implemented a telemetry and observability framework for MCTools using Azure Application Insights, enabling custom event instrumentation, real-time monitoring, and issue detection",
+                "Developed a localization framework enabling MCTools to be available in 20+ languages, bringing it into compliance with the minecraft.net domain",
+                "Modernized the MCTools TypeScript codebase and expanded content validation suites to reduce manual review workload for the Minecraft Vanilla team and external creators",
+                "Mentored and onboarded new engineers to the Minecraft web and platform technology stack, providing guidance on React, TypeScript, deployment workflows, telemetry tooling, and development practices"
+            ],
+            "technologies": [
+                "TypeScript",
+                "React",
+                "C++",
+                "C#",
+                "Node.js",
+                "Azure Application Insights",
+                "Azure VMs",
+                "Selenium",
+                "Agile"
+            ]
+        },
+        {
+            "company": "DIGARC",
+            "role": "Software Design Engineer in Test",
+            "period": "March 2021 - March 2022",
+            "description": "QA and test automation engineer on an Agile product team, responsible for frontend regression coverage and quality processes for production deployments.",
+            "achievements": [
+                "Created and maintained several hundred automated end-to-end tests ensuring reliable frontend regression coverage",
+                "Developed detailed test plans and tracked quality initiatives using Jira for an Agile team of developers, testers, and a PM",
+                "Led weekly team meetings to evaluate performance and functionality metrics in preparation for production deployments"
+            ],
+            "technologies": [
+                "Selenium",
+                "JavaScript",
+                "Jira",
+                "Agile"
+            ]
+        },
+        {
+            "company": "Andromeda Systems Inc.",
+            "role": "Software Design Engineer in Test",
+            "period": "August 2019 - March 2021",
+            "description": "Test automation and frontend engineer for an inventory management application used by the U.S. Navy for aircraft maintenance.",
+            "achievements": [
+                "Developed over 500 automated tests using Selenium for an inventory management application used by the U.S. Navy for aircraft maintenance",
+                "Built dozens of Angular components using TypeScript for administrative tools to improve client operations and workflows",
+                "Ensured product quality in an Agile environment by triaging bugs and writing user stories and test cases"
+            ],
+            "technologies": [
+                "Selenium",
+                "Angular",
+                "TypeScript",
+                "Agile"
+            ]
+        },
+        {
+            "company": "LenelS2",
+            "role": "QA Automation Engineer CO-OP",
+            "period": "January 2018 - August 2018",
+            "description": "Co-op placement contributing to a cloud-based facilities security product, focusing on test automation and UI quality.",
+            "achievements": [
+                "Developed and designed a cloud-based facilities security product, contributing Selenium frontend automated tests and UI/UX improvements",
+                "Tested software interactions with security scanners by configuring and running automated tests in Linux terminals",
+                "Ensured product specifications met security standards by developing detailed test plans in an Agile environment"
+            ],
+            "technologies": [
+                "Selenium",
+                "Linux",
+                "Agile"
+            ]
+        }
+    ],
+    "projects": [
+        {
+            "name": "Jeemzu API",
+            "description": "A production ASP.NET Core 8 REST API powering a personal gaming leaderboard platform and personal chatbot. Features JWT authentication with refresh token rotation, per-game leaderboards with guest and authenticated score submissions, and a RAG-powered personal assistant chatbot backed by pgvector similarity search and the OpenAI API via Semantic Kernel.",
+            "url": "jeemzu.me",
+            "technologies": [
+                "C#",
+                ".NET 8",
+                "ASP.NET Core",
+                "PostgreSQL",
+                "pgvector",
+                "Entity Framework Core",
+                "Semantic Kernel",
+                "OpenAI API",
+                "JWT",
+                "Azure App Services",
+                "Docker"
+            ],
+            "highlights": [
+                "Implemented a full RAG pipeline: personal info stored as structured JSON is chunked, embedded via OpenAI text-embedding-3-small, and stored in pgvector with an HNSW cosine distance index for fast semantic retrieval",
+                "Chat endpoint is stateless — client supplies conversation history each request, server embeds the question, retrieves top-K relevant chunks, injects them into the system prompt, and streams back a grounded answer from gpt-4o-mini",
+                "Deployed on Azure App Services with Azure PostgreSQL, auto-migrating schema on startup via Entity Framework Core"
+            ]
+        },
+        {
+            "name": "Personal Website Platform",
+            "description": "A full-stack personal web platform serving as a portfolio and gaming hub. Built independently from infrastructure provisioning through production deployment.",
+            "url": "jeemzu.me",
+            "technologies": [
+                "React",
+                "TypeScript",
+                "Node.js",
+                "Azure App Services",
+                "Azure PostgreSQL",
+                "CI/CD"
+            ],
+            "highlights": [
+                "Implemented backend service hosting, environment configuration, API deployment, and PostgreSQL integration on Azure",
+                "Established CI/CD workflows for automated deployment and infrastructure management",
+                "Configured application monitoring, logging, and operational tooling for production support",
+                "Managed the complete deployment lifecycle independently including cloud provisioning, configuration, and production support"
+            ]
+        }
+    ],
+    "education": [
+        {
+            "institution": "Rochester Institute of Technology",
+            "degree": "BS in Game Design and Development",
+            "period": "August 2015 - May 2019",
+            "highlights": [
+                "Studied game systems design, software engineering, interactive media, and computer science fundamentals",
+                "Built foundational skills in C++, Java, and software architecture through project-based coursework"
+            ]
+        }
+    ]
+}

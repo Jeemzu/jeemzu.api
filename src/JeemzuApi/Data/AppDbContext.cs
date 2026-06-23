@@ -1,5 +1,6 @@
 using JeemzuApi.Models;
 using Microsoft.EntityFrameworkCore;
+using Pgvector;
 
 namespace JeemzuApi.Data;
 
@@ -10,10 +11,36 @@ public class AppDbContext : DbContext
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Ensure the pgvector extension exists in the database.
+        // EF will emit "CREATE EXTENSION IF NOT EXISTS vector" in the migration.
+        modelBuilder.HasPostgresExtension("vector");
+
+        // KnowledgeChunk — stores text chunks with their vector embeddings for RAG retrieval
+        modelBuilder.Entity<KnowledgeChunk>(entity =>
+        {
+            entity.HasKey(k => k.Id);
+            entity.Property(k => k.SourceKey).IsRequired().HasMaxLength(200);
+            entity.Property(k => k.Content).IsRequired();
+            entity.Property(k => k.Embedding).HasColumnType("vector(1536)");
+
+            // Unique constraint so ingestion can reliably upsert by source key
+            entity.HasIndex(k => k.SourceKey).IsUnique();
+
+            // HNSW index for fast approximate cosine similarity search.
+            // m=16 (connections per layer) and ef_construction=64 (build-time search depth)
+            // are sensible defaults for a small-to-medium knowledge base.
+            entity.HasIndex(k => k.Embedding)
+                  .HasMethod("hnsw")
+                  .HasOperators("vector_cosine_ops")
+                  .HasStorageParameter("m", 16)
+                  .HasStorageParameter("ef_construction", 64);
+        });
 
         // Score configuration
         modelBuilder.Entity<Score>(entity =>

@@ -114,3 +114,48 @@ public class TokenResponse
     public int ExpiresIn { get; set; }
     public string Role { get; set; } = string.Empty;
 }
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// A single message in a conversation. Role must be "user" or "assistant",
+/// mirroring the OpenAI chat message convention so the client payload is
+/// immediately familiar to anyone who has used the OpenAI API.
+/// </summary>
+public class ConversationMessage
+{
+    [Required]
+    [AllowedValues("user", "assistant")]
+    public string Role { get; set; } = string.Empty;
+
+    [Required]
+    public string Content { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/chat.</summary>
+public class ChatRequest
+{
+    [Required]
+    [MinLength(1)]
+    [MaxLength(2000)]
+    public string Question { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Prior conversation turns, oldest first.
+    /// Omit or send an empty array to start a fresh conversation.
+    /// The server is stateless — the client owns the history.
+    /// </summary>
+    public List<ConversationMessage> History { get; set; } = [];
+}
+
+/// <summary>Response from POST /api/chat.</summary>
+public class ChatResponse
+{
+    public string Answer { get; set; } = string.Empty;
+}
+
+/// <summary>Response from POST /api/admin/knowledge/ingest.</summary>
+public class IngestResponse
+{
+    public int ChunksUpserted { get; set; }
+}
