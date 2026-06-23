@@ -6,6 +6,7 @@ using JeemzuApi.Data;
 using JeemzuApi.DTOs;
 using JeemzuApi.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace JeemzuApi.Services;
@@ -18,11 +19,13 @@ public class AuthService : IAuthService
 
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
+    private readonly IHostEnvironment _env;
 
-    public AuthService(AppDbContext db, IConfiguration config)
+    public AuthService(AppDbContext db, IConfiguration config, IHostEnvironment env)
     {
         _db = db;
         _config = config;
+        _env = env;
     }
 
     public async Task<(TokenResponse Token, bool WasCreated)> RegisterUserAsync(
@@ -78,7 +81,11 @@ public class AuthService : IAuthService
         stored.IsRevoked = true;
         await _db.SaveChangesAsync();
 
-        return await IssueTokensAsync(stored.Username, "Admin", response);
+        // Look up the user's actual role from the DB so it isn't elevated by a refresh
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == stored.Username);
+        var role = user?.Role ?? "User";
+
+        return await IssueTokensAsync(stored.Username, role, response);
     }
 
     public async Task LogoutAsync(string refreshToken, HttpResponse response)
@@ -92,11 +99,12 @@ public class AuthService : IAuthService
             await _db.SaveChangesAsync();
         }
 
+        var isProduction = !_env.IsDevelopment();
         response.Cookies.Delete(RefreshTokenCookie, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
+            Secure = isProduction,
+            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Lax,
             Path = "/api/auth"
         });
     }
@@ -109,11 +117,14 @@ public class AuthService : IAuthService
         var accessToken = BuildAccessToken(username, role);
         var refreshToken = await StoreRefreshTokenAsync(username);
 
+        // In development (HTTP), Secure=true + SameSite=None prevents the browser from
+        // storing the cookie. Use Lax/Secure=false locally so the full auth flow works.
+        var isProduction = !_env.IsDevelopment();
         response.Cookies.Append(RefreshTokenCookie, refreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
+            Secure = isProduction,
+            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddDays(RefreshTokenDays),
             Path = "/api/auth"
         });
