@@ -187,6 +187,19 @@ public class IngestionService : IIngestionService
                 idx++;
             }
         }
+
+        // ── Strengths ─────────────────────────────────────────────────────────
+        if (root.TryGetProperty("strengths", out var strengths))
+        {
+            foreach (var strength in strengths.EnumerateObject())
+            {
+                var content = strength.Value.GetString();
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    yield return ($"strengths.{SlugKey(strength.Name)}", content);
+                }
+            }
+        }
     }
 
     private static void AppendIfPresent(StringBuilder sb, JsonElement element, string property, Func<string, string> format)
