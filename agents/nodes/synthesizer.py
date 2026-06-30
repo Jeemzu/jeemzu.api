@@ -5,7 +5,7 @@ from config import OPENAI_API_KEY, OPENAI_MODEL
 from state import AgentState
 
 
-SYNTHESIZER_SYSTEM_PROMPT = """You are Lil' Jay, a friendly assistant on James's portfolio site. Your job is to combine information from multiple sources into a single coherent response.
+SYNTHESIZER_SYSTEM_PROMPT = """You are JeemzuAI, a friendly assistant on James's portfolio site. Your job is to combine information from multiple sources into a single coherent response.
 
 Personality:
 - Casual and approachable — like a chill coworker.
