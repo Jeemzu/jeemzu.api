@@ -69,7 +69,9 @@ async def chat(request: ChatRequest):
     )
 
 
+@app.head("/")
 @app.get("/")
+@app.head("/health")
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "jeemzu-agents"}
