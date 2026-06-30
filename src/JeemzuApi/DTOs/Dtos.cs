@@ -178,3 +178,48 @@ public class KnowledgeSearchResponse
     public List<KnowledgeSearchResult> Results { get; set; } = [];
     public int TotalResults { get; set; }
 }
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+/// <summary>Returned from GET /api/admin/users — one entry per user.</summary>
+public class AdminUserResponse
+{
+    public Guid Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public bool OptedIn { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>Request body for PATCH /api/admin/users/{username}/role.</summary>
+public class UpdateRoleRequest
+{
+    [Required]
+    [AllowedValues("User", "Admin")]
+    public string Role { get; set; } = string.Empty;
+}
+
+/// <summary>A knowledge chunk summary for the admin viewer.</summary>
+public class AdminKnowledgeChunkResponse
+{
+    public Guid Id { get; set; }
+    public string SourceKey { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>Response from GET /api/admin/knowledge/chunks.</summary>
+public class AdminKnowledgeListResponse
+{
+    public List<AdminKnowledgeChunkResponse> Chunks { get; set; } = [];
+    public int TotalChunks { get; set; }
+}
+
+/// <summary>Health status of an external service.</summary>
+public class ServiceHealthStatus
+{
+    public string Service { get; set; } = string.Empty;
+    public bool Healthy { get; set; }
+    public int? ResponseTimeMs { get; set; }
+    public string? Error { get; set; }
+}
