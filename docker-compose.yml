@@ -11,10 +11,24 @@ services:
     volumes:
       - jeemzu_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jeemzu -d jeemzu_db"]
+      test: [ "CMD-SHELL", "pg_isready -U jeemzu -d jeemzu_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: jeemzu_agents
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./agents/.env
+    environment:
+      DOTNET_API_URL: http://host.docker.internal:5000/api
+    depends_on:
+      - postgres
 
 volumes:
   jeemzu_pgdata:
