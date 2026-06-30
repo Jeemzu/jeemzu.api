@@ -118,7 +118,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "https://jeemzu.me",
                 "https://www.jeemzu.me",
-                "http://localhost:5173"   // Vite default port
+                "http://localhost:5173",  // Vite default port
+                "http://localhost:8001"   // Python agent service
             )
             .AllowAnyHeader()
             .AllowAnyMethod()

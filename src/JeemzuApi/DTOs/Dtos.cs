@@ -159,3 +159,22 @@ public class IngestResponse
 {
     public int ChunksUpserted { get; set; }
 }
+
+// ── Knowledge Search ─────────────────────────────────────────────────────────
+
+/// <summary>
+/// A single knowledge chunk returned from GET /api/knowledge/search.
+/// Contains raw content retrieved via vector similarity — no LLM processing.
+/// </summary>
+public class KnowledgeSearchResult
+{
+    public string SourceKey { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+}
+
+/// <summary>Response from GET /api/knowledge/search.</summary>
+public class KnowledgeSearchResponse
+{
+    public List<KnowledgeSearchResult> Results { get; set; } = [];
+    public int TotalResults { get; set; }
+}

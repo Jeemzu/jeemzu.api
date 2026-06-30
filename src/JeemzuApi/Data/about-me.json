@@ -196,5 +196,13 @@
                 "Built foundational skills in C++, Java, and software architecture through project-based coursework"
             ]
         }
-    ]
+    ],
+    "strengths": {
+        "rapid_prototyping": "James excels at rapidly prototyping solutions end-to-end. He independently built a full-stack portfolio platform with a multi-agent AI chatbot (LangGraph orchestration, RAG pipeline, tool-calling agents), a game leaderboard API, and multiple browser games — all architected, deployed, and iterated on within weeks. At Microsoft, he co-engineered Minecraft's first automated multiplayer performance testing framework from scratch.",
+        "communication": "Strong communicator who thrives in collaborative environments. Led weekly team meetings at DIGARC to evaluate deployment readiness. Mentored and onboarded new engineers at Microsoft, providing hands-on guidance across the full technology stack. Comfortable presenting technical concepts to both engineering and non-technical stakeholders.",
+        "adaptability": "Proven ability to context-switch across domains: live-event systems serving millions of players, developer tooling, test automation, cloud infrastructure, AI/ML pipelines, and full-stack web development. Comfortable wearing multiple hats — has shipped production code in TypeScript, C#, C++, Python, and Java across frontend, backend, DevOps, and AI workloads.",
+        "ai_and_agentic": "Hands-on experience building production agentic AI systems: multi-agent orchestration with LangGraph (supervisor/router pattern, conditional routing, tool-calling agents), RAG pipelines with pgvector and OpenAI embeddings, Semantic Kernel integration, and prompt engineering. Built a multi-agent chatbot with specialized Knowledge, Game Stats, and Web Search agents that autonomously decide execution paths and call external APIs as tools.",
+        "client_facing": "Experience delivering software for external clients and end users: built inventory management tools for the U.S. Navy (Andromeda Systems), contributed to Minecraft's creator ecosystem serving millions of players and third-party developers, and developed developer-facing tooling integrated into content pipelines used by external studio partners.",
+        "entrepreneurial": "Self-driven builder who independently provisions cloud infrastructure, designs system architecture, implements full-stack solutions, and manages production deployments. Approaches problems with a startup mentality — ship fast, iterate based on feedback, and own the outcome end-to-end."
+    }
 }
