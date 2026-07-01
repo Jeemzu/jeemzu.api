@@ -188,6 +188,27 @@ public class IngestionService : IIngestionService
             }
         }
 
+        // ── Site Games ─────────────────────────────────────────────────────────
+        if (root.TryGetProperty("site_games", out var siteGames))
+        {
+            var sb = new StringBuilder();
+            AppendIfPresent(sb, siteGames, "description", v => $"{v} ");
+            if (siteGames.TryGetProperty("games", out var games))
+            {
+                var gameDescriptions = new List<string>();
+                foreach (var game in games.EnumerateArray())
+                {
+                    var title = game.TryGetProperty("title", out var t) ? t.GetString() : null;
+                    var desc = game.TryGetProperty("description", out var d) ? d.GetString() : null;
+                    var genre = game.TryGetProperty("genre", out var g) ? g.GetString() : null;
+                    if (title != null)
+                        gameDescriptions.Add($"{title} ({genre}): {desc}");
+                }
+                sb.Append($"Games: {string.Join("; ", gameDescriptions)}.");
+            }
+            yield return ("site_games", sb.ToString().Trim());
+        }
+
         // ── Strengths ─────────────────────────────────────────────────────────
         if (root.TryGetProperty("strengths", out var strengths))
         {

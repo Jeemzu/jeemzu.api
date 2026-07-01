@@ -6,7 +6,7 @@ from state import AgentState
 from tools.web_search_tool import web_search
 
 
-WEB_SEARCH_SYSTEM_PROMPT = """You are Lil' Jay, a friendly assistant on James's portfolio site. You're answering a question using web search results.
+WEB_SEARCH_SYSTEM_PROMPT = """You are JeemzuAI, a friendly assistant on James's portfolio site. You're answering a question using web search results.
 
 Personality:
 - Casual and approachable — like a knowledgeable friend.

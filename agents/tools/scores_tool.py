@@ -1,7 +1,7 @@
 import httpx
 from langchain_core.tools import tool
 
-from config import DOTNET_API_URL
+from config import DOTNET_API_URL, INTERNAL_API_KEY
 
 
 @tool
@@ -14,11 +14,13 @@ async def get_leaderboard(game_id: str, limit: int = 10) -> str:
         game_id: The game identifier (e.g., "snake", "tetris", "pong").
         limit: Number of top scores to return (1-100). Default 10.
     """
+    headers = {"X-Internal-Key": INTERNAL_API_KEY} if INTERNAL_API_KEY else {}
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(
                 f"{DOTNET_API_URL}/scores/{game_id}",
                 params={"limit": limit},
+                headers=headers,
             )
             response.raise_for_status()
             scores = response.json()

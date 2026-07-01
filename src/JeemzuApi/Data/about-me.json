@@ -197,6 +197,53 @@
             ]
         }
     ],
+    "site_games": {
+        "description": "The games available to play on jeemzu.me. All games are browser-based and playable directly on the site.",
+        "games": [
+            {
+                "id": "platformer",
+                "title": "The (Im)Possible Game",
+                "genre": "Native",
+                "description": "A side-scrolling platformer built in C++ compiled to WebAssembly. Features a level editor where players can create and play their own custom challenges."
+            },
+            {
+                "id": "zaim",
+                "title": "zAim",
+                "genre": "Arcade",
+                "description": "An FPS aim trainer — click targets before they disappear to test your reflexes."
+            },
+            {
+                "id": "snake",
+                "title": "Snake",
+                "genre": "Classics",
+                "description": "Classic Snake — eat food and grow longer without hitting yourself."
+            },
+            {
+                "id": "brickbreak",
+                "title": "Brick Break",
+                "genre": "Classics",
+                "description": "Break all the bricks with your paddle and ball."
+            },
+            {
+                "id": "tetris",
+                "title": "Tetris",
+                "genre": "Classics",
+                "description": "Stack falling blocks to clear lines."
+            },
+            {
+                "id": "pong",
+                "title": "Pong",
+                "genre": "Classics",
+                "description": "Classic Pong against an AI opponent."
+            },
+            {
+                "id": "progenitors",
+                "title": "The Progenitors",
+                "genre": "RPG",
+                "description": "A turn-based RPG with locally saved progress. Currently in development."
+            }
+        ]
+    },
     "strengths": {
         "rapid_prototyping": "James excels at rapidly prototyping solutions end-to-end. He independently built a full-stack portfolio platform with a multi-agent AI chatbot (LangGraph orchestration, RAG pipeline, tool-calling agents), a game leaderboard API, and multiple browser games — all architected, deployed, and iterated on within weeks. At Microsoft, he co-engineered Minecraft's first automated multiplayer performance testing framework from scratch.",
         "communication": "Strong communicator who thrives in collaborative environments. Led weekly team meetings at DIGARC to evaluate deployment readiness. Mentored and onboarded new engineers at Microsoft, providing hands-on guidance across the full technology stack. Comfortable presenting technical concepts to both engineering and non-technical stakeholders.",

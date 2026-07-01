@@ -1,4 +1,4 @@
-from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_tavily import TavilySearch
 from langchain_core.tools import tool
 
 from config import TAVILY_API_KEY
@@ -17,7 +17,7 @@ async def web_search(query: str) -> str:
     if not TAVILY_API_KEY:
         return "Web search is not configured (no API key)."
 
-    search = TavilySearchResults(
+    search = TavilySearch(
         max_results=3,
         api_key=TAVILY_API_KEY,
     )
