@@ -1,0 +1,357 @@
+{
+  "locations": {
+    "village_square": {
+      "name": "Village Square",
+      "description": "A quiet village square with cobblestone paths and a central fountain. The tavern sits to the north, and a forest trail leads east.",
+      "tilemap": "village",
+      "connections": {
+        "north": "tavern",
+        "east": "forest_path"
+      },
+      "npcs": [
+        "merchant"
+      ],
+      "enemies": [],
+      "spawn": {
+        "x": 5,
+        "y": 8
+      },
+      "items_on_ground": []
+    },
+    "tavern": {
+      "name": "The Rusty Flagon",
+      "description": "A warm tavern with creaking wooden floors and the smell of ale. A grizzled keeper tends the bar, and a hooded sage sits in the corner.",
+      "tilemap": "tavern",
+      "connections": {
+        "south": "village_square"
+      },
+      "npcs": [
+        "tavern_keeper",
+        "sage"
+      ],
+      "enemies": [],
+      "spawn": {
+        "x": 4,
+        "y": 7
+      },
+      "items_on_ground": []
+    },
+    "forest_path": {
+      "name": "Forest Path",
+      "description": "A winding dirt path through ancient oaks. Moss covers everything, and the air is thick with the smell of damp earth. The path darkens ahead toward a stone archway.",
+      "tilemap": "forest",
+      "connections": {
+        "west": "village_square",
+        "north": "crypt_entrance"
+      },
+      "npcs": [],
+      "enemies": [],
+      "spawn": {
+        "x": 1,
+        "y": 5
+      },
+      "items_on_ground": []
+    },
+    "crypt_entrance": {
+      "name": "Crypt Entrance",
+      "description": "A crumbling stone archway marks the entrance to the Sunken Crypt. Cold air seeps from the darkness below. Worn steps descend into shadow.",
+      "tilemap": "crypt_entrance",
+      "connections": {
+        "south": "forest_path",
+        "down": "crypt_interior"
+      },
+      "npcs": [],
+      "enemies": [
+        "skeleton_warrior"
+      ],
+      "spawn": {
+        "x": 5,
+        "y": 2
+      },
+      "items_on_ground": []
+    },
+    "crypt_interior": {
+      "name": "The Sunken Crypt",
+      "description": "Deep underground, the crypt opens into a vast chamber lit by eerie green torches. Ancient coffins line the walls, and a dark altar dominates the far end.",
+      "tilemap": "crypt_interior",
+      "connections": {
+        "up": "crypt_entrance"
+      },
+      "npcs": [],
+      "enemies": [
+        "crypt_wraith"
+      ],
+      "spawn": {
+        "x": 5,
+        "y": 8
+      },
+      "items_on_ground": [
+        "amulet_of_light"
+      ]
+    }
+  },
+  "npcs": {
+    "tavern_keeper": {
+      "name": "Bram the Keeper",
+      "sprite_key": "tavern_keeper",
+      "portrait": "tavern_keeper",
+      "location": "tavern",
+      "position": {
+        "x": 4,
+        "y": 3
+      },
+      "personality": "Gruff but kind-hearted tavern keeper. Speaks in short, direct sentences. Worried about strange noises from the crypt disturbing his customers. Offers free ale to anyone brave enough to investigate.",
+      "dialogue_context": "Bram has run The Rusty Flagon for 20 years. Recently, undead creatures have been emerging from the old crypt east of town, scaring off travelers and hurting business.",
+      "can_give_quests": [
+        "clear_the_crypt"
+      ],
+      "can_trade": false
+    },
+    "merchant": {
+      "name": "Lyssa the Wanderer",
+      "sprite_key": "merchant",
+      "portrait": "merchant",
+      "location": "village_square",
+      "position": {
+        "x": 7,
+        "y": 5
+      },
+      "personality": "Cheerful traveling merchant with a sing-song voice. Always looking for a deal. Offers potions and basic equipment at fair prices.",
+      "dialogue_context": "Lyssa travels between villages selling goods. She's heard rumors about treasure in the old crypt but won't go near it herself.",
+      "can_give_quests": [],
+      "can_trade": true,
+      "shop_inventory": [
+        "healing_potion",
+        "iron_sword",
+        "wooden_shield",
+        "mage_staff",
+        "leather_armor"
+      ]
+    },
+    "sage": {
+      "name": "Orin the Veiled",
+      "sprite_key": "sage",
+      "portrait": "sage",
+      "location": "tavern",
+      "position": {
+        "x": 7,
+        "y": 6
+      },
+      "personality": "Mysterious and cryptic old sage. Speaks in riddles and half-truths. Knows the history of the crypt and the wraith that haunts it. Will share knowledge if asked respectfully.",
+      "dialogue_context": "Orin is an ancient scholar who knows the crypt was once a temple to a forgotten god. The wraith is the temple's last guardian, bound by a cursed amulet. Destroying or purifying the amulet will free the wraith — or enrage it.",
+      "can_give_quests": [],
+      "can_trade": false
+    }
+  },
+  "enemies": {
+    "skeleton_warrior": {
+      "name": "Skeleton Warrior",
+      "sprite_key": "skeleton",
+      "stats": {
+        "max_hp": 25,
+        "hp": 25,
+        "max_mp": 0,
+        "mp": 0,
+        "strength": 5,
+        "dexterity": 3,
+        "intelligence": 1,
+        "armor": 2,
+        "vitality": 8,
+        "agility": 2,
+        "perception": 3
+      },
+      "xp_reward": 30,
+      "trains": {
+        "strength": 20,
+        "vitality": 10
+      },
+      "loot_table": [
+        {
+          "item_id": "healing_potion",
+          "chance": 0.4
+        },
+        {
+          "item_id": "bone_fragment",
+          "chance": 0.6
+        }
+      ],
+      "behavior": "aggressive",
+      "abilities": [
+        "basic_attack"
+      ]
+    },
+    "crypt_wraith": {
+      "name": "Crypt Wraith",
+      "sprite_key": "wraith",
+      "stats": {
+        "max_hp": 60,
+        "hp": 60,
+        "max_mp": 30,
+        "mp": 30,
+        "strength": 7,
+        "dexterity": 6,
+        "intelligence": 8,
+        "armor": 3,
+        "vitality": 10,
+        "agility": 8,
+        "perception": 7
+      },
+      "xp_reward": 120,
+      "trains": {
+        "intelligence": 25,
+        "agility": 20,
+        "vitality": 15
+      },
+      "loot_table": [
+        {
+          "item_id": "wraith_essence",
+          "chance": 1.0
+        },
+        {
+          "item_id": "shadow_cloak",
+          "chance": 0.5
+        }
+      ],
+      "behavior": "boss",
+      "abilities": [
+        "basic_attack",
+        "life_drain",
+        "shadow_bolt"
+      ],
+      "is_boss": true
+    }
+  },
+  "items": {
+    "healing_potion": {
+      "name": "Healing Potion",
+      "item_type": "consumable",
+      "description": "A small vial of red liquid that restores 20 HP.",
+      "effect": {
+        "heal_hp": 20
+      }
+    },
+    "iron_sword": {
+      "name": "Iron Sword",
+      "item_type": "weapon",
+      "description": "A sturdy iron blade. Reliable if unremarkable.",
+      "effect": {
+        "damage_die": "d8",
+        "stat": "strength"
+      }
+    },
+    "mage_staff": {
+      "name": "Mage Staff",
+      "item_type": "weapon",
+      "description": "A gnarled wooden staff crackling with faint energy.",
+      "effect": {
+        "damage_die": "d6",
+        "stat": "intelligence",
+        "mp_cost": 3
+      }
+    },
+    "daggers": {
+      "name": "Twin Daggers",
+      "item_type": "weapon",
+      "description": "A pair of wickedly sharp daggers. Fast and deadly.",
+      "effect": {
+        "damage_die": "d6",
+        "stat": "dexterity",
+        "hits": 2
+      }
+    },
+    "wooden_shield": {
+      "name": "Wooden Shield",
+      "item_type": "armor",
+      "description": "A battered but functional wooden shield.",
+      "effect": {
+        "armor_bonus": 2
+      }
+    },
+    "leather_armor": {
+      "name": "Leather Armor",
+      "item_type": "armor",
+      "description": "Supple leather armor that doesn't restrict movement.",
+      "effect": {
+        "armor_bonus": 3
+      }
+    },
+    "bone_fragment": {
+      "name": "Bone Fragment",
+      "item_type": "quest_item",
+      "description": "A jagged piece of enchanted bone. It hums with residual dark energy.",
+      "effect": null
+    },
+    "amulet_of_light": {
+      "name": "Amulet of Light",
+      "item_type": "quest_item",
+      "description": "A golden amulet radiating warm light. It seems to repel the undead.",
+      "effect": {
+        "wraith_vulnerability": true
+      }
+    },
+    "wraith_essence": {
+      "name": "Wraith Essence",
+      "item_type": "quest_item",
+      "description": "A swirling dark mist captured in a crystal vial. Proof of the wraith's defeat.",
+      "effect": null
+    },
+    "shadow_cloak": {
+      "name": "Shadow Cloak",
+      "item_type": "armor",
+      "description": "A cloak woven from shadow itself. Grants the wearer near-invisibility.",
+      "effect": {
+        "armor_bonus": 4,
+        "dexterity_bonus": 2
+      }
+    },
+    "crypt_key": {
+      "name": "Crypt Key",
+      "item_type": "quest_item",
+      "description": "A heavy iron key encrusted with verdigris. Opens the sealed door to the crypt's inner chamber.",
+      "effect": null
+    }
+  },
+  "quests": {
+    "clear_the_crypt": {
+      "name": "Clear the Sunken Crypt",
+      "description": "Bram the tavern keeper has asked you to investigate the old crypt east of town. Undead creatures have been emerging and scaring off travelers. Descend into the crypt and defeat whatever lurks within.",
+      "giver_npc": "tavern_keeper",
+      "objectives": [
+        {
+          "id": "reach_crypt",
+          "description": "Find the entrance to the Sunken Crypt"
+        },
+        {
+          "id": "defeat_wraith",
+          "description": "Defeat the Crypt Wraith"
+        },
+        {
+          "id": "return_to_bram",
+          "description": "Return to Bram with proof of your victory"
+        }
+      ],
+      "reward_xp": 200,
+      "reward_items": [
+        "shadow_cloak"
+      ]
+    }
+  },
+  "starting_location": "village_square",
+  "starting_items": {
+    "warrior": [
+      "iron_sword",
+      "wooden_shield",
+      "healing_potion"
+    ],
+    "mage": [
+      "mage_staff",
+      "healing_potion",
+      "healing_potion"
+    ],
+    "rogue": [
+      "daggers",
+      "leather_armor",
+      "healing_potion"
+    ]
+  }
+}

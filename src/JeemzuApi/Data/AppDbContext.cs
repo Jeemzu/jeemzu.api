@@ -12,6 +12,9 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
+    public DbSet<Party> Parties => Set<Party>();
+    public DbSet<PartyMember> PartyMembers => Set<PartyMember>();
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +82,57 @@ public class AppDbContext : DbContext
             entity.Property(r => r.Token).IsRequired().HasMaxLength(256);
             entity.Property(r => r.Username).IsRequired().HasMaxLength(50);
             entity.HasIndex(r => r.Token).IsUnique();
+        });
+
+        // Party configuration
+        modelBuilder.Entity<Party>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Code).IsRequired().HasMaxLength(10);
+            entity.Property(p => p.Status).IsRequired().HasMaxLength(20);
+            entity.Property(p => p.RpgSessionId).HasMaxLength(100);
+            entity.Property(p => p.CurrentGamePhase).IsRequired().HasMaxLength(20);
+            entity.Property(p => p.CurrentTurnUsername).HasMaxLength(50);
+            // Not unique globally — completed parties may share a historical code — but
+            // PartyService only checks uniqueness against non-completed parties.
+            entity.HasIndex(p => p.Code);
+            entity.HasOne<Campaign>()
+                  .WithMany()
+                  .HasForeignKey(p => p.CampaignId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // PartyMember configuration
+        modelBuilder.Entity<PartyMember>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+            entity.Property(m => m.Username).IsRequired().HasMaxLength(50);
+            entity.Property(m => m.CharacterName).IsRequired().HasMaxLength(50);
+            entity.Property(m => m.CharacterClass).IsRequired().HasMaxLength(20);
+            entity.Property(m => m.ConnectionId).HasMaxLength(100);
+            entity.Property(m => m.ControlledByUsername).HasMaxLength(50);
+            entity.HasIndex(m => m.ConnectionId);
+            entity.HasOne(m => m.Party)
+                  .WithMany(p => p.Members)
+                  .HasForeignKey(m => m.PartyId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Campaign — host-owned RPG save file
+        modelBuilder.Entity<Campaign>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+            entity.Property(c => c.GameStateJson).IsRequired();
+            entity.Property(c => c.CharacterSummaryJson).IsRequired();
+            entity.Property(c => c.CurrentLocation).HasMaxLength(100);
+            entity.Property(c => c.Status).IsRequired().HasMaxLength(20);
+            entity.HasIndex(c => c.HostUserId);
+            entity.HasOne(c => c.HostUser)
+                  .WithMany()
+                  .HasForeignKey(c => c.HostUserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

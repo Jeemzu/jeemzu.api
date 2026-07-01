@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace JeemzuApi.DTOs;
 
@@ -177,4 +178,126 @@ public class KnowledgeSearchResponse
 {
     public List<KnowledgeSearchResult> Results { get; set; } = [];
     public int TotalResults { get; set; }
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+/// <summary>Returned from GET /api/admin/users — one entry per user.</summary>
+public class AdminUserResponse
+{
+    public Guid Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public bool OptedIn { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>Request body for PATCH /api/admin/users/{username}/role.</summary>
+public class UpdateRoleRequest
+{
+    [Required]
+    [AllowedValues("User", "Admin")]
+    public string Role { get; set; } = string.Empty;
+}
+
+/// <summary>A knowledge chunk summary for the admin viewer.</summary>
+public class AdminKnowledgeChunkResponse
+{
+    public Guid Id { get; set; }
+    public string SourceKey { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>Response from GET /api/admin/knowledge/chunks.</summary>
+public class AdminKnowledgeListResponse
+{
+    public List<AdminKnowledgeChunkResponse> Chunks { get; set; } = [];
+    public int TotalChunks { get; set; }
+}
+
+/// <summary>Health status of an external service.</summary>
+public class ServiceHealthStatus
+{
+    public string Service { get; set; } = string.Empty;
+    public bool Healthy { get; set; }
+    public int? ResponseTimeMs { get; set; }
+    public string? Error { get; set; }
+}
+
+// ── RPG / Party (multiplayer AI Game Master) ──────────────────────────────────
+
+/// <summary>
+/// A single member of a party, as broadcast to clients over SignalR.
+/// </summary>
+public class PartyMemberResponse
+{
+    public string Username { get; set; } = string.Empty;
+    public string CharacterName { get; set; } = string.Empty;
+    public string CharacterClass { get; set; } = string.Empty;
+    public bool IsHost { get; set; }
+    public bool IsConnected { get; set; }
+    public string? ControlledBy { get; set; }
+}
+
+/// <summary>
+/// Party state broadcast to clients — returned by CreateParty/JoinParty and sent via the
+/// PartyUpdated SignalR event.
+/// </summary>
+public class PartyResponse
+{
+    public Guid PartyId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public Guid? CampaignId { get; set; }
+    public List<PartyMemberResponse> Members { get; set; } = [];
+}
+
+/// <summary>
+/// Internal contract sent to the Python RPG service — one entry per party member.
+/// Serialized with a snake_case naming policy, so PlayerId → "player_id", etc.
+/// </summary>
+public class RpgPlayerCreate
+{
+    public string PlayerId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string CharacterClass { get; set; } = string.Empty;
+}
+
+/// <summary>Deserialized response from POST /rpg/new on the Python RPG service.</summary>
+public class RpgNewGameResult
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string Narrative { get; set; } = string.Empty;
+    public List<JsonElement> VisualCommands { get; set; } = [];
+    public JsonElement UiState { get; set; }
+}
+
+/// <summary>Deserialized response from POST /rpg/{sessionId}/action on the Python RPG service.</summary>
+public class RpgActionResult
+{
+    public string Narrative { get; set; } = string.Empty;
+    public List<JsonElement> VisualCommands { get; set; } = [];
+    public JsonElement UiState { get; set; }
+    public string ActionType { get; set; } = string.Empty;
+}
+
+// ── Campaigns (RPG save files) ────────────────────────────────────────────────
+
+public class CampaignSummaryResponse
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string CurrentLocation { get; set; } = string.Empty;
+    public string CharacterSummaryJson { get; set; } = "[]";
+    public string Status { get; set; } = string.Empty;
+    public DateTimeOffset LastPlayedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+public class SaveCampaignResponse
+{
+    public Guid CampaignId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public DateTimeOffset SavedAt { get; set; }
 }

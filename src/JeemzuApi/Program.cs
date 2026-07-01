@@ -1,4 +1,5 @@
 using JeemzuApi.Data;
+using JeemzuApi.Hubs;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,21 @@ builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// RPG multiplayer — SignalR for real-time party/gameplay, Party service for lobby
+// management, Turn service for combat turn validation/timeouts, and an HTTP proxy
+// to the separate Python LangGraph RPG orchestration service.
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IPartyService, PartyService>();
+builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddSingleton<ITurnService, TurnService>();
+
+var rpgServiceUrl = builder.Configuration["Rpg:ServiceUrl"] ?? "http://localhost:8001";
+builder.Services.AddHttpClient<IRpgProxyService, RpgProxyService>(client =>
+{
+    client.BaseAddress = new Uri(rpgServiceUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 // ── Semantic Kernel + OpenAI ─────────────────────────────────────────────────
 // The Kernel and the LLM/embedding service instances are singletons: they hold
 // no per-request state and the underlying HTTP clients are designed to be reused.
@@ -101,6 +117,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        };
+
+        // SignalR WebSocket/SSE connections can't set an Authorization header, so the
+        // JS client sends the access token via query string instead — extract it here.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -150,5 +181,6 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+app.MapHub<GameHub>("/hubs/game");
 
 app.Run();
