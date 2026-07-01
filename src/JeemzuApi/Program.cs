@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Resend;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,6 +59,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Resend email service — used by POST /api/contact
+var resendApiKey = builder.Configuration["Resend:ApiKey"]
+    ?? throw new InvalidOperationException(
+        "Resend:ApiKey is not configured. Set it via: dotnet user-secrets set \"Resend:ApiKey\" \"<key>\"");
+builder.Services.AddResend(options => { options.ApiToken = resendApiKey; });
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // RPG multiplayer — SignalR for real-time party/gameplay, Party service for lobby
 // management, Turn service for combat turn validation/timeouts, and an HTTP proxy
