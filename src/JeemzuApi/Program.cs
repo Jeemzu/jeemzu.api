@@ -61,10 +61,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Resend email service — used by POST /api/contact
-var resendApiKey = builder.Configuration["Resend:ApiKey"]
-    ?? throw new InvalidOperationException(
-        "Resend:ApiKey is not configured. Set it via: dotnet user-secrets set \"Resend:ApiKey\" \"<key>\"");
-builder.Services.AddResend(options => { options.ApiToken = resendApiKey; });
+// Key is optional at startup; EmailService will return 503 if unconfigured.
+builder.Services.AddResend(options =>
+{
+    options.ApiToken = builder.Configuration["Resend:ApiKey"] ?? string.Empty;
+});
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 // RPG multiplayer — SignalR for real-time party/gameplay, Party service for lobby
