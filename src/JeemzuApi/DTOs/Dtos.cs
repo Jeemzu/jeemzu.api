@@ -410,7 +410,7 @@ public class BudgetDataDto
     public int AutopayBalanceCents { get; set; }
 }
 
-/// <summary>Request body for PUT /api/admin/budget.</summary>
+/// <summary>Request body for PUT /api/budget.</summary>
 public class SaveBudgetRequest
 {
     [Required]
@@ -423,7 +423,7 @@ public class SaveBudgetRequest
     public Guid? Revision { get; set; }
 }
 
-/// <summary>Returned from GET and PUT /api/admin/budget.</summary>
+/// <summary>Returned from GET and PUT /api/budget.</summary>
 public class BudgetSnapshotResponse
 {
     public BudgetDataDto Data { get; set; } = new();
