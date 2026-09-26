@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Party> Parties => Set<Party>();
     public DbSet<PartyMember> PartyMembers => Set<PartyMember>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +133,17 @@ public class AppDbContext : DbContext
             entity.HasOne(c => c.HostUser)
                   .WithMany()
                   .HasForeignKey(c => c.HostUserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // BudgetSnapshot — one saved budget per user, keyed by the owning user
+        modelBuilder.Entity<BudgetSnapshot>(entity =>
+        {
+            entity.HasKey(b => b.UserId);
+            entity.Property(b => b.DataJson).IsRequired().HasColumnType("jsonb");
+            entity.HasOne(b => b.User)
+                  .WithMany()
+                  .HasForeignKey(b => b.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

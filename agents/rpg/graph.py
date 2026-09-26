@@ -9,6 +9,7 @@ from nodes.npc import npc_node
 from nodes.world_state import world_state_node
 from nodes.combat import combat_node
 from nodes.composer import composer_node
+from nodes.enemy_flavor import enemy_flavor_node
 
 
 def route_after_router(state: GameState) -> str:
@@ -23,10 +24,13 @@ def route_after_world_state(state: GameState) -> str:
     """After world state mutations, decide which agent handles the actual resolution."""
     game_phase = state.get("game_phase", "")
     npc_target = state.get("npc_target", "")
+    generated_enemies = state.get("generated_enemies", [])
 
-    # In combat (either just triggered this turn, or already ongoing) — combat_node
-    # owns initiative, turn resolution, and win/loss/flee handling.
+    # In combat — check if we need to flavor enemies first
     if game_phase == GamePhase.COMBAT.value:
+        # If we have generated enemies that haven't been flavored yet, add AI flavor first
+        if generated_enemies and not generated_enemies[0].get("flavored"):
+            return "enemy_flavor"
         return "combat"
 
     # If in dialogue with an NPC, route to NPC agent
@@ -44,6 +48,7 @@ def build_graph() -> StateGraph:
     # Add nodes
     graph.add_node("router", router_node)
     graph.add_node("world_state", world_state_node)
+    graph.add_node("enemy_flavor", enemy_flavor_node)  # AI flavor for dynamic enemies
     graph.add_node("narrator", narrator_node)
     graph.add_node("npc", npc_node)
     graph.add_node("combat", combat_node)
@@ -57,12 +62,16 @@ def build_graph() -> StateGraph:
         "world_state": "world_state",
     })
 
-    # World state → narrator, npc, or combat (depending on game phase)
+    # World state → enemy_flavor (if needed), narrator, npc, or combat
     graph.add_conditional_edges("world_state", route_after_world_state, {
+        "enemy_flavor": "enemy_flavor",
         "narrator": "narrator",
         "npc": "npc",
         "combat": "combat",
     })
+    
+    # Enemy flavor → combat (after adding unique names/descriptions)
+    graph.add_edge("enemy_flavor", "combat")
 
     # Narrator → composer
     graph.add_edge("narrator", "composer")

@@ -35,6 +35,17 @@ class GamePhase(str, Enum):
     DIALOGUE = "dialogue"
 
 
+class DamageType(str, Enum):
+    """Damage types for DOS2-style combat with elemental resistances."""
+    PHYSICAL = "physical"
+    FIRE = "fire"
+    ICE = "ice"
+    LIGHTNING = "lightning"
+    POISON = "poison"
+    HOLY = "holy"
+    DARK = "dark"
+
+
 # ─── Character Models ─────────────────────────────────────────────────────────
 
 
@@ -87,6 +98,15 @@ class Item(BaseModel):
 # ─── Combat Models ────────────────────────────────────────────────────────────
 
 
+class ArenaEffect(BaseModel):
+    """Arena-wide environmental effect affecting all combatants (DOS2/Pokemon-style)."""
+    effect_type: str  # e.g., "burning_ground", "icy_terrain", "electrified", "poisoned_air"
+    duration_turns: int  # remaining turns before expiration
+    magnitude: float = 1.0  # damage multiplier, e.g., 1.25 = +25% fire damage
+    damage_type: DamageType | None = None  # which damage type is affected
+    description: str = ""  # narrative description for UI
+
+
 class CombatEntity(BaseModel):
     id: str
     name: str
@@ -95,6 +115,9 @@ class CombatEntity(BaseModel):
     max_hp: int
     stats: Stats | None = None  # full stats for players, simplified for enemies
     sprite_key: str | None = None
+    # DOS2-style resistances and weaknesses
+    resistances: dict[str, float] = Field(default_factory=dict)  # damage_type → multiplier (0.5 = 50% damage)
+    weaknesses: dict[str, float] = Field(default_factory=dict)    # damage_type → multiplier (1.5 = 150% damage)
 
 
 class CombatState(BaseModel):
@@ -102,6 +125,8 @@ class CombatState(BaseModel):
     initiative_order: list[str]  # entity IDs in turn order
     current_turn_index: int = 0
     round_number: int = 1
+    arena_effects: list[ArenaEffect] = Field(default_factory=list)  # active environmental effects
+    active_effects_log: list[str] = Field(default_factory=list)  # narrative log of effect triggers
 
 
 # ─── Visual Command Models ────────────────────────────────────────────────────
@@ -146,6 +171,11 @@ class GameState(TypedDict):
     player_action: str
     action_type: str  # ActionType value
 
+    # Narration pacing hint ("opening" | "resume" | "") — set by server entry points
+    # (new game / campaign import), cleared at the start of every player action.
+    # The narrator uses it to pick a response-length budget.
+    narration_hint: str
+
     # Party (multiple players)
     players: dict  # player_id → CharacterSheet.model_dump()
     inventories: dict  # player_id → list of Item.model_dump()
@@ -164,6 +194,11 @@ class GameState(TypedDict):
     # Combat
     game_phase: str  # GamePhase value
     combat_state: dict  # CombatState.model_dump() or empty dict
+
+    # Dynamic difficulty tracking
+    combat_wins: int  # total combat victories
+    combat_losses: int  # total combat defeats
+    difficulty_modifier: float  # 0.8 = easier, 1.0 = normal, 1.2 = harder
 
     # Context (rolling window to manage token usage)
     recent_narrative: list[str]  # last 5 narrative outputs

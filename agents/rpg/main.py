@@ -140,6 +140,7 @@ def _create_initial_state(players: list[PlayerCreate]) -> dict:
         "player_id": "",
         "player_action": "",
         "action_type": "",
+        "narration_hint": "opening",  # First graph invoke narrates the campaign opening
         "players": players_dict,
         "inventories": inventories_dict,
         "turn_order": [p.player_id for p in players],
@@ -240,6 +241,7 @@ async def submit_action(session_id: str, request: ActionRequest):
     current_state["player_id"] = request.player_id
     current_state["player_action"] = request.action
     current_state["action_type"] = ""
+    current_state["narration_hint"] = ""
     current_state["narrative_output"] = ""
     current_state["visual_commands"] = []
     current_state["state_mutations"] = []
@@ -330,6 +332,7 @@ async def import_state(request: ImportRequest):
     state["thread_id"] = session_id
 
     # Reset ephemeral per-action fields
+    state["narration_hint"] = "resume"  # Re-orientation narration, not a fresh opening
     state["narrative_output"] = ""
     state["visual_commands"] = []
     state["state_mutations"] = []

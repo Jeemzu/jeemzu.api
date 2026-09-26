@@ -1,6 +1,16 @@
 """Response composer — assembles final response from agent outputs for the frontend."""
 
+import json
+from pathlib import Path
+
 from state import GameState
+
+
+def _location_display_name(location_id: str) -> str:
+    """Resolves a location ID to its display name for the frontend status bar."""
+    world_path = Path(__file__).parent.parent / "data" / "world.json"
+    world_data = json.loads(world_path.read_text())
+    return world_data["locations"].get(location_id, {}).get("name", location_id)
 
 
 async def composer_node(state: GameState) -> dict:
@@ -20,6 +30,7 @@ async def composer_node(state: GameState) -> dict:
     # Build UI state updates for the frontend
     ui_state: dict = {
         "current_location": current_location,
+        "current_location_name": _location_display_name(current_location),
         "game_phase": game_phase,
         "players": {},
     }

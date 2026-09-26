@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from state import GameState, GamePhase, ActionType
+from state import GameState, GamePhase, ActionType, DamageType
 from tools.progression import apply_equipment_bonus
+from tools.enemy_generator import generate_encounter, get_arena_effects_for_templates
+from tools.skill_check import build_dialogue_option_payloads
 
 
 def _load_world() -> dict:
@@ -106,11 +108,14 @@ def _handle_explore(
         # Update location
         new_state["current_location"] = new_location
 
-        # Track visited
+        # Track visited — and record the move so the narrator knows whether this
+        # is a first discovery (rich narration) or familiar ground (brief).
         visited = list(state.get("visited_locations", []))
-        if new_location not in visited:
+        first_visit = new_location not in visited
+        if first_visit:
             visited.append(new_location)
         new_state["visited_locations"] = visited
+        mutations.append({"type": "moved", "to": new_location, "first_visit": first_visit})
 
         # Visual commands for the transition
         visual_commands.append({
@@ -137,8 +142,44 @@ def _handle_explore(
         # Check if entering a location triggers combat
         enemies_here = new_loc_data.get("enemies", [])
         if enemies_here:
+            # Generate dynamic encounter based on party strength
+            players_dict = state.get("players", {})
+            party_levels = [p.get("level", 1) for p in players_dict.values()]
+            party_size = len(party_levels)
+            
+            # Get encounter theme from location (e.g., "undead", "beast", "boss_dragon")
+            theme = new_loc_data.get("encounter_theme")
+            difficulty_mod = state.get("difficulty_modifier", 1.0)
+            
+            # Generate balanced encounter
+            generated_enemies, ability_pool = generate_encounter(
+                party_levels=party_levels,
+                party_size=party_size,
+                theme=theme,
+                difficulty_modifier=difficulty_mod,
+            )
+            
+            # Convert CombatEntity objects to dict format for combat_state
+            enemy_ids = [e.id for e in generated_enemies]
+            
+            # Get arena effects based on the generated enemies
+            enemy_templates = [
+                {
+                    "id": e.id,
+                    "arena_effect_chance": 0.0,  # Will be loaded from templates by combat node
+                }
+                for e in generated_enemies
+            ]
+            arena_effects = get_arena_effects_for_templates(enemy_templates)
+            
             new_state["game_phase"] = GamePhase.COMBAT.value
-            mutations.append({"type": "trigger_combat", "enemies": enemies_here})
+            new_state["generated_enemies"] = [e.model_dump() for e in generated_enemies]  # Store for combat_node
+            new_state["arena_effects"] = arena_effects  # Pre-determined arena effects
+            mutations.append({
+                "type": "trigger_combat",
+                "enemies": enemy_ids,
+                "generated_data": True,  # Signal to combat_node to use generated_enemies
+            })
 
         # Check quest objective: reaching a location
         active_quests = list(state.get("active_quests", []))
@@ -279,12 +320,15 @@ def _handle_talk(
         new_state["game_phase"] = GamePhase.DIALOGUE.value
 
         npc_data = world_data["npcs"].get(target_npc, {})
+        acting_player = state.get("players", {}).get(state.get("player_id", ""), {})
+        player_stats = acting_player.get("stats", {}) if acting_player else {}
         visual_commands.append({
             "type": "show_dialogue",
             "data": {
                 "npc_id": target_npc,
                 "portrait": npc_data.get("portrait", target_npc),
                 "npc_name": npc_data.get("name", target_npc),
+                "dialogue_options": build_dialogue_option_payloads(npc_data, player_stats),
             },
         })
 

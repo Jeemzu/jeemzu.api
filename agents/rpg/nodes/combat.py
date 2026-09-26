@@ -6,6 +6,9 @@ returns to a living player, and victory/defeat/flee resolution (XP, loot,
 leveling, quest hooks, respawn). All numeric outcomes come from the
 deterministic tools in tools/ — no LLM calls are used here, keeping combat
 fast and reproducible; narration is built from clear, formulaic templates.
+
+DOS2-inspired mechanics: elemental damage types with resistances/weaknesses,
+arena-wide environmental effects that boost/weaken damage types.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ import json
 import random
 from pathlib import Path
 
-from state import GameState, GamePhase, ActionType
+from state import GameState, GamePhase, ActionType, DamageType, ArenaEffect
 from tools.dice import roll_initiative, stat_modifier
 from tools.combat_calc import (
     calculate_attack_damage,
@@ -34,6 +37,118 @@ CLASS_WEAPON_DEFAULTS: dict[str, tuple[str, str, int]] = {
 }
 
 
+# ─── DOS2-Style Damage Calculation ───────────────────────────────────────────
+
+
+def parse_damage_type(action_text: str, ability_name: str = "") -> DamageType:
+    """Extract damage type from action text or ability name."""
+    text = (action_text + " " + ability_name).lower()
+    
+    if any(word in text for word in ["fire", "flame", "burn", "fireball", "inferno"]):
+        return DamageType.FIRE
+    if any(word in text for word in ["ice", "frost", "freeze", "cold", "blizzard"]):
+        return DamageType.ICE
+    if any(word in text for word in ["lightning", "thunder", "electric", "shock", "storm"]):
+        return DamageType.LIGHTNING
+    if any(word in text for word in ["poison", "venom", "toxic", "acid"]):
+        return DamageType.POISON
+    if any(word in text for word in ["holy", "divine", "sacred", "light", "radiant"]):
+        return DamageType.HOLY
+    if any(word in text for word in ["dark", "shadow", "necrotic", "death", "curse"]):
+        return DamageType.DARK
+    
+    # Default to physical for melee attacks
+    return DamageType.PHYSICAL
+
+
+def calculate_effective_damage(
+    base_damage: int,
+    damage_type: DamageType,
+    target_entity: dict,
+    arena_effects: list[dict],
+) -> tuple[int, str]:
+    """
+    Apply resistances, weaknesses, and arena effects to base damage.
+    
+    Args:
+        base_damage: Raw damage before modifiers
+        damage_type: Type of damage being dealt
+        target_entity: CombatEntity dict with resistances/weaknesses
+        arena_effects: List of active ArenaEffect dicts
+    
+    Returns:
+        Tuple of (final_damage, description_suffix)
+        description_suffix examples: " (resisted)", " (critical!)", " (boosted by storm)"
+    """
+    multiplier = 1.0
+    descriptors = []
+    
+    # Apply target resistances
+    resistances = target_entity.get("resistances", {})
+    if damage_type.value in resistances:
+        res_mult = resistances[damage_type.value]
+        multiplier *= res_mult
+        if res_mult <= 0.5:
+            descriptors.append("resisted")
+        elif res_mult == 0.0:
+            descriptors.append("immune")
+    
+    # Apply target weaknesses
+    weaknesses = target_entity.get("weaknesses", {})
+    if damage_type.value in weaknesses:
+        weak_mult = weaknesses[damage_type.value]
+        multiplier *= weak_mult
+        if weak_mult >= 1.5:
+            descriptors.append("critical")
+    
+    # Apply arena effects
+    for effect in arena_effects:
+        if effect.get("damage_type") == damage_type.value:
+            arena_mult = effect.get("magnitude", 1.0)
+            multiplier *= arena_mult
+            if arena_mult > 1.0:
+                descriptors.append(f"boosted by {effect.get('effect_type', 'effect')}")
+            elif arena_mult < 1.0:
+                descriptors.append(f"weakened by {effect.get('effect_type', 'effect')}")
+    
+    final_damage = max(1, int(base_damage * multiplier))  # Minimum 1 damage
+    
+    # Build description suffix
+    suffix = ""
+    if descriptors:
+        if "immune" in descriptors:
+            suffix = " (immune!)"
+        elif "critical" in descriptors and "resisted" not in descriptors:
+            suffix = " (critical!)"
+        elif "resisted" in descriptors:
+            suffix = " (resisted)"
+        elif any("boosted" in d for d in descriptors):
+            boost_desc = next(d for d in descriptors if "boosted" in d)
+            suffix = f" ({boost_desc})"
+    
+    return final_damage, suffix
+
+
+def tick_arena_effects(arena_effects: list[dict]) -> tuple[list[dict], list[str]]:
+    """
+    Decrement arena effect durations and remove expired effects.
+    
+    Returns:
+        Tuple of (updated_effects, expiration_messages)
+    """
+    messages = []
+    updated = []
+    
+    for effect in arena_effects:
+        effect["duration_turns"] -= 1
+        if effect["duration_turns"] <= 0:
+            messages.append(f"The {effect.get('effect_type', 'effect').replace('_', ' ')} dissipates...")
+        else:
+            updated.append(effect)
+    
+    return updated, messages
+
+
 def _load_world() -> dict:
     world_path = Path(__file__).parent.parent / "data" / "world.json"
     return json.loads(world_path.read_text())
@@ -49,35 +164,64 @@ async def combat_node(state: GameState) -> dict:
     visual_commands: list[dict] = []
     narrative_parts: list[str] = []
 
+    # Initialize arena_effects if not present
+    if "arena_effects" not in combat_state:
+        combat_state["arena_effects"] = []
+    if "active_effects_log" not in combat_state:
+        combat_state["active_effects_log"] = []
+
     trigger = next((m for m in mutations_in if m.get("type") == "trigger_combat"), None)
     just_started = bool(trigger) or not combat_state.get("initiative_order")
 
     if just_started:
         enemy_ids = trigger["enemies"] if trigger else []
-        enemy_entities = _build_combat_entities(enemy_ids, world_data)
+        
+        # Check if we have pre-generated enemies from world_state_node
+        generated_enemies = state.get("generated_enemies", [])
+        pre_rolled_arena_effects = state.get("arena_effects", [])
+        
+        if generated_enemies and trigger and trigger.get("generated_data"):
+            # Use the dynamically generated enemies (already include resistances/weaknesses)
+            enemy_entities = generated_enemies
+        else:
+            # Fallback to static world.json enemies for backwards compatibility
+            enemy_entities = _build_combat_entities(enemy_ids, world_data)
+            pre_rolled_arena_effects = []
+        
         initiative = _roll_initiative_order(players, enemy_entities)
         combat_state = {
             "enemies": enemy_entities,
             "initiative_order": initiative,
             "current_turn_index": -1,
             "round_number": 1,
+            "arena_effects": pre_rolled_arena_effects,  # Use pre-rolled arena effects from generator
+            "active_effects_log": [],
         }
         enemy_names = ", ".join(e["name"] for e in enemy_entities)
         narrative_parts.append(f"{enemy_names} block your path! Roll for initiative!")
+        
+        # Add arena effect announcement if any
+        if pre_rolled_arena_effects:
+            effect_names = ", ".join([e["effect_type"].replace("_", " ") for e in pre_rolled_arena_effects])
+            narrative_parts.append(f"The battlefield is altered by: {effect_names}!")
+        
         visual_commands.append({
             "type": "combat_started",
             "data": {
                 "enemies": [
                     {
                         "id": e["id"],
-                        "sprite_key": e["sprite_key"],
+                        "sprite_key": e.get("sprite_key", "enemy"),
                         "name": e["name"],
                         "hp": e["stats"]["hp"],
                         "max_hp": e["stats"]["max_hp"],
+                        "resistances": e.get("resistances", {}),
+                        "weaknesses": e.get("weaknesses", {}),
                     }
                     for e in enemy_entities
                 ],
                 "initiative_order": initiative,
+                "arena_effects": pre_rolled_arena_effects,
             },
         })
     else:
@@ -119,11 +263,26 @@ async def combat_node(state: GameState) -> dict:
     order = combat_state["initiative_order"]
     idx = combat_state.get("current_turn_index", -1)
     guard = 0
+    round_changed = False
     while guard < MAX_TURN_ADVANCE_ITERATIONS:
         guard += 1
         idx = (idx + 1) % len(order)
         if idx == 0:
-            combat_state["round_number"] = combat_state.get("round_number", 1) + 1
+            old_round = combat_state.get("round_number", 1)
+            combat_state["round_number"] = old_round + 1
+            round_changed = True
+            
+            # Tick arena effects at the start of each new round
+            arena_effects, expiry_messages = tick_arena_effects(combat_state.get("arena_effects", []))
+            combat_state["arena_effects"] = arena_effects
+            if expiry_messages:
+                narrative_parts.extend(expiry_messages)
+                combat_state["active_effects_log"].extend(expiry_messages)
+                visual_commands.append({
+                    "type": "arena_effects_updated",
+                    "data": {"effects": arena_effects, "messages": expiry_messages},
+                })
+        
         actor = order[idx]
 
         if actor in players:
@@ -182,6 +341,8 @@ def _build_combat_entities(enemy_ids: list[str], world_data: dict) -> list[dict]
             "behavior": edata.get("behavior", "aggressive"),
             "abilities": edata.get("abilities", ["basic_attack"]),
             "is_boss": edata.get("is_boss", False),
+            "resistances": dict(edata.get("resistances", {})),  # DOS2-style resistances
+            "weaknesses": dict(edata.get("weaknesses", {})),    # DOS2-style weaknesses
         })
 
     return entities
@@ -278,15 +439,28 @@ def _resolve_player_action(
 
         if not roll_to_hit(stats["perception"], target["stats"].get("agility", 0)):
             visual_commands.append({"type": "combat_miss", "data": {"actor": acting_id, "target": target["id"]}})
-            return f"{player['name']} hurls a fireball at {target['name']}, but it fizzles wide!", False
+            return f"{player['name']} hurls a spell at {target['name']}, but it fizzles wide!", False
 
-        damage = calculate_spell_damage("d8", stats["intelligence"], target["stats"]["armor"])
-        target["stats"]["hp"] = max(0, target["stats"]["hp"] - damage)
+        # Calculate base damage
+        base_damage = calculate_spell_damage("d8", stats["intelligence"], target["stats"]["armor"])
+        
+        # Apply DOS2-style damage modifiers
+        damage_type = parse_damage_type(action_text, "spell")
+        arena_effects = combat_state.get("arena_effects", [])
+        final_damage, modifier_desc = calculate_effective_damage(base_damage, damage_type, target, arena_effects)
+        
+        target["stats"]["hp"] = max(0, target["stats"]["hp"] - final_damage)
         visual_commands.append({
             "type": "combat_spell",
-            "data": {"caster": acting_id, "spell": "fireball", "target": target["id"], "damage": damage},
+            "data": {
+                "caster": acting_id,
+                "spell": damage_type.value,
+                "target": target["id"],
+                "damage": final_damage,
+                "damage_type": damage_type.value,
+            },
         })
-        result = f"{player['name']} hurls a fireball at {target['name']} for {damage} damage!"
+        result = f"{player['name']} casts a {damage_type.value} spell at {target['name']} for {final_damage} damage{modifier_desc}!"
         if target["stats"]["hp"] <= 0:
             result += f" {target['name']} is defeated!"
             visual_commands.append({"type": "enemy_death", "data": {"entity": target["id"]}})
@@ -314,13 +488,24 @@ def _resolve_player_action(
         return f"{player['name']} attacks {target['name']} but misses!", False
 
     weapon_die, stat_key, hits = _weapon_profile(player, inventories.get(acting_id, []))
-    damage = calculate_attack_damage(weapon_die, stats[stat_key], target["stats"]["armor"], hits=hits)
-    target["stats"]["hp"] = max(0, target["stats"]["hp"] - damage)
+    base_damage = calculate_attack_damage(weapon_die, stats[stat_key], target["stats"]["armor"], hits=hits)
+    
+    # Apply DOS2-style damage modifiers
+    damage_type = parse_damage_type(action_text, "attack")
+    arena_effects = combat_state.get("arena_effects", [])
+    final_damage, modifier_desc = calculate_effective_damage(base_damage, damage_type, target, arena_effects)
+    
+    target["stats"]["hp"] = max(0, target["stats"]["hp"] - final_damage)
     visual_commands.append({
         "type": "combat_attack",
-        "data": {"actor": acting_id, "target": target["id"], "damage": damage},
+        "data": {
+            "actor": acting_id,
+            "target": target["id"],
+            "damage": final_damage,
+            "damage_type": damage_type.value,
+        },
     })
-    result = f"{player['name']} attacks {target['name']} for {damage} damage!"
+    result = f"{player['name']} attacks {target['name']} for {final_damage} damage{modifier_desc}!"
     if target["stats"]["hp"] <= 0:
         result += f" {target['name']} is defeated!"
         visual_commands.append({"type": "enemy_death", "data": {"entity": target["id"]}})
@@ -337,32 +522,59 @@ def _enemy_turn(enemy: dict, players: dict, combat_state: dict, visual_commands:
     target = living_players[target_id]
     defending = combat_state.setdefault("defending", {})
     is_defending = defending.pop(target_id, False)
+    arena_effects = combat_state.get("arena_effects", [])
 
     if not roll_to_hit(enemy["stats"].get("perception", 0), target["stats"].get("agility", 0)):
         visual_commands.append({"type": "combat_miss", "data": {"actor": enemy["id"], "target": target_id}})
         return f"{enemy['name']} attacks {target['name']} but misses!"
 
     if enemy.get("is_boss") and "shadow_bolt" in enemy.get("abilities", []) and _rare_roll():
-        damage = calculate_spell_damage("d8", enemy["stats"]["intelligence"], target["stats"]["armor"])
+        base_damage = calculate_spell_damage("d8", enemy["stats"]["intelligence"], target["stats"]["armor"])
+        
+        # Apply DOS2-style damage modifiers (shadow bolt = dark damage)
+        damage_type = DamageType.DARK
+        # Create temporary target entity dict (players don't have resistances/weaknesses yet)
+        target_entity = {"resistances": {}, "weaknesses": {}}
+        final_damage, modifier_desc = calculate_effective_damage(base_damage, damage_type, target_entity, arena_effects)
+        
         if is_defending:
-            damage = max(1, damage // 2)
-        target["stats"]["hp"] = max(0, target["stats"]["hp"] - damage)
+            final_damage = max(1, final_damage // 2)
+        
+        target["stats"]["hp"] = max(0, target["stats"]["hp"] - final_damage)
         visual_commands.append({
             "type": "combat_spell",
-            "data": {"caster": enemy["id"], "spell": "shadow_bolt", "target": target_id, "damage": damage},
+            "data": {
+                "caster": enemy["id"],
+                "spell": "shadow_bolt",
+                "target": target_id,
+                "damage": final_damage,
+                "damage_type": damage_type.value,
+            },
         })
-        line = f"{enemy['name']} unleashes a shadow bolt at {target['name']} for {damage} damage!"
+        line = f"{enemy['name']} unleashes a shadow bolt at {target['name']} for {final_damage} damage{modifier_desc}!"
         return line + " (guarded)" if is_defending else line
 
-    damage = calculate_attack_damage("d6", enemy["stats"]["strength"], target["stats"]["armor"])
+    base_damage = calculate_attack_damage("d6", enemy["stats"]["strength"], target["stats"]["armor"])
+    
+    # Apply DOS2-style damage modifiers (basic attack = physical)
+    damage_type = DamageType.PHYSICAL
+    target_entity = {"resistances": {}, "weaknesses": {}}
+    final_damage, modifier_desc = calculate_effective_damage(base_damage, damage_type, target_entity, arena_effects)
+    
     if is_defending:
-        damage = max(1, damage // 2)
-    target["stats"]["hp"] = max(0, target["stats"]["hp"] - damage)
+        final_damage = max(1, final_damage // 2)
+    
+    target["stats"]["hp"] = max(0, target["stats"]["hp"] - final_damage)
     visual_commands.append({
         "type": "combat_attack",
-        "data": {"actor": enemy["id"], "target": target_id, "damage": damage},
+        "data": {
+            "actor": enemy["id"],
+            "target": target_id,
+            "damage": final_damage,
+            "damage_type": damage_type.value,
+        },
     })
-    line = f"{enemy['name']} attacks {target['name']} for {damage} damage!"
+    line = f"{enemy['name']} attacks {target['name']} for {final_damage} damage{modifier_desc}!"
     if is_defending:
         line += " Their guard softened the blow!"
     if target["stats"]["hp"] <= 0:
@@ -390,6 +602,11 @@ def _end_combat(
     completed_quests = list(state.get("completed_quests", []))
     current_location = state.get("current_location", "village_square")
     new_location = current_location
+    
+    # Track combat outcomes for dynamic difficulty
+    combat_wins = state.get("combat_wins", 0)
+    combat_losses = state.get("combat_losses", 0)
+    difficulty_modifier = state.get("difficulty_modifier", 1.0)
 
     if victory:
         looted_items: list[str] = []
@@ -437,6 +654,14 @@ def _end_combat(
             narrative_parts.append(f"Victory! The party found: {item_names}.")
         else:
             narrative_parts.append("Victory!")
+        
+        # Track victory for dynamic difficulty
+        combat_wins += 1
+        
+        # Adjust difficulty based on win streak (every 3 consecutive wins = slightly harder)
+        if combat_wins % 3 == 0 and combat_losses == 0:
+            difficulty_modifier = min(1.4, difficulty_modifier + 0.1)
+            narrative_parts.append("The enemies seem to be getting tougher...")
 
         if "crypt_wraith" in defeated_types:
             for quest in active_quests:
@@ -453,11 +678,18 @@ def _end_combat(
     else:
         narrative_parts.append(
             "The party has been defeated! Everything fades to black... "
-            "You awaken back in the village square, battered but alive."
+            "You awaken back at Pilgrim's Rest, battered but alive."
         )
         for player in players.values():
             player["stats"]["hp"] = max(1, player["stats"]["max_hp"] // 2)
             player["stats"]["mp"] = player["stats"]["max_mp"]
+        
+        # Track loss for dynamic difficulty
+        combat_losses += 1
+        
+        # Adjust difficulty down after loss (easier next time)
+        difficulty_modifier = max(0.7, difficulty_modifier - 0.15)
+        narrative_parts.append("Perhaps the next battle will be more forgiving...")
 
         village = world_data["locations"]["village_square"]
         visual_commands.append({"type": "combat_ended", "data": {"result": "defeat"}})
@@ -474,6 +706,9 @@ def _end_combat(
         "current_location": new_location,
         "active_quests": active_quests,
         "completed_quests": completed_quests,
+        "combat_wins": combat_wins,
+        "combat_losses": combat_losses,
+        "difficulty_modifier": difficulty_modifier,
         "narrative_output": " ".join(narrative_parts),
         "visual_commands": visual_commands,
         "state_mutations": [],
