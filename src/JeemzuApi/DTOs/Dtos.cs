@@ -302,6 +302,135 @@ public class SaveCampaignResponse
     public DateTimeOffset SavedAt { get; set; }
 }
 
+// ── Budget (admin-only personal budget snapshot) ──────────────────────────────
+
+/// <summary>Which account a bill or debt payment is drafted from: "shared" or "autopay".</summary>
+public static class BudgetAccountSource
+{
+    public const string Pattern = "^(shared|autopay)$";
+}
+
+public class BudgetPersonDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(0, int.MaxValue)]
+    public int PersonalPerPaycheckCents { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int EssentialsPerPaycheckCents { get; set; }
+
+    /// <summary>Signed — a checking account can be overdrawn.</summary>
+    public int PersonalBalanceCents { get; set; }
+}
+
+public class BudgetBillDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(0, int.MaxValue)]
+    public int AmountCents { get; set; }
+
+    [Range(1, 31)]
+    public int DueDay { get; set; }
+
+    /// <summary>Empty string means uncategorized.</summary>
+    [MaxLength(100)]
+    public string Category { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression(BudgetAccountSource.Pattern)]
+    public string PaidFrom { get; set; } = "shared";
+}
+
+public class BudgetDebtDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(0, int.MaxValue)]
+    public int BalanceCents { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int MinPaymentCents { get; set; }
+
+    /// <summary>Promo payoff amount; null when the account has no promotion.</summary>
+    [Range(0, int.MaxValue)]
+    public int? SuggestedPaymentCents { get; set; }
+
+    public bool HasPromotion { get; set; }
+
+    [Range(1, 31)]
+    public int DueDay { get; set; }
+
+    [Required]
+    [RegularExpression(BudgetAccountSource.Pattern)]
+    public string PaidFrom { get; set; } = "autopay";
+}
+
+/// <summary>
+/// Mirrors the client-side BudgetData type. Collection caps bound the payload so a
+/// single save cannot store an unbounded document.
+/// </summary>
+public class BudgetDataDto
+{
+    [Required]
+    [MaxLength(200)]
+    public List<BudgetPersonDto> People { get; set; } = [];
+
+    [Required]
+    [MaxLength(1000)]
+    public List<BudgetBillDto> Bills { get; set; } = [];
+
+    [Required]
+    [MaxLength(1000)]
+    public List<BudgetDebtDto> Debts { get; set; } = [];
+
+    /// <summary>Signed — a checking account can be overdrawn.</summary>
+    public int EssentialsBalanceCents { get; set; }
+
+    /// <summary>Signed — a checking account can be overdrawn.</summary>
+    public int AutopayBalanceCents { get; set; }
+}
+
+/// <summary>Request body for PUT /api/admin/budget.</summary>
+public class SaveBudgetRequest
+{
+    [Required]
+    public BudgetDataDto Data { get; set; } = new();
+
+    /// <summary>
+    /// Revision returned by the last load or save. Null only when creating the
+    /// first budget; a mismatch means another device saved first.
+    /// </summary>
+    public Guid? Revision { get; set; }
+}
+
+/// <summary>Returned from GET and PUT /api/admin/budget.</summary>
+public class BudgetSnapshotResponse
+{
+    public BudgetDataDto Data { get; set; } = new();
+    public Guid Revision { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 // ── Contact ───────────────────────────────────────────────────────────────────
 
 /// <summary>Request body for POST /api/contact.</summary>

@@ -33,5 +33,22 @@ services:
     depends_on:
       - postgres
 
+  rpg:
+    build:
+      context: ./agents/rpg
+      dockerfile: Dockerfile
+    container_name: jeemzu_rpg
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./agents/rpg/.env
+    environment:
+      DOTNET_API_URL: http://host.docker.internal:5000/api
+    volumes:
+      - ./agents/rpg:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+    depends_on:
+      - postgres
+
 volumes:
   jeemzu_pgdata:
