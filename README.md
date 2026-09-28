@@ -30,7 +30,7 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 | OpenAI                         | Supplies chat completions and text embeddings to the .NET RAG API and Python agents. API keys are provided through deployment configuration.                                                  |
 | Render                         | Hosts the Python chat-agent endpoint configured by the frontend. The site tries the agent before falling back to the .NET chat endpoint; the API also exposes an optional agent health check. |
 | Tavily                         | Optional web-search provider used by the general-purpose Python agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                        |
-| Resend                         | Optional email provider used by `POST /api/contact` when `Resend:ApiKey` is configured.                                                                                                       |
+| Resend                         | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                             |
 | GitHub Actions                 | Builds the API container, pushes it to ACR, and dispatches `api-types-update` to the frontend repo. This is deployment/type-generation automation, not a runtime service.                     |
 
 Production API and agent URLs are supplied by deployment configuration. The production hostname in [API.md](API.md) differs from the frontend's configured `VITE_API_URL`; verify the intended public endpoint before treating either reference as canonical.
@@ -230,7 +230,15 @@ dotnet user-secrets set "Jwt:Secret" "<256-bit-key>"
 dotnet user-secrets set "Jwt:Issuer" "jeemzu-api"
 dotnet user-secrets set "Jwt:Audience" "jeemzu-frontend"
 dotnet user-secrets set "OpenAI:ApiKey" "<your-key>"
+
+# Optional — required only to actually deliver verification / password reset emails
+dotnet user-secrets set "Resend:ApiKey" "<your-key>"
+dotnet user-secrets set "Resend:AccountFrom" "Jeemzu <no-reply@your-verified-domain>"
 ```
+
+Verification and reset links point at `Frontend:BaseUrl` (`http://localhost:5173` in Development,
+`https://jeemzu.me` otherwise). Without `Resend:ApiKey` registration still succeeds — the email is
+skipped and logged, so the address stays unverified and can't be used for password recovery.
 
 ### 3. Run the API
 
@@ -238,8 +246,8 @@ dotnet user-secrets set "OpenAI:ApiKey" "<your-key>"
 dotnet run --project src/JeemzuApi
 ```
 
-- Swagger UI: http://localhost:5000/swagger
-- Health check: http://localhost:5000/health
+- Swagger UI: http://localhost:5050/swagger
+- Health check: http://localhost:5050/health
 - Migrations apply automatically on startup
 
 ### 4. Run agents locally (without Docker)
@@ -283,6 +291,8 @@ App Service env vars:
 - `ConnectionStrings__DefaultConnection` — Azure PostgreSQL connection string
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
 - `OpenAI__ApiKey`
+- `Resend__ApiKey`, `Resend__AccountFrom` — account verification and password reset email
+- `Frontend__BaseUrl` — base URL used to build verification and reset links
 - `WEBSITES_PORT=8080`
 - `ASPNETCORE_ENVIRONMENT=Production`
 

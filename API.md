@@ -21,11 +21,13 @@ JeemzuAPI uses JWT Bearer tokens for authentication with httpOnly cookie-based r
 3. When the access token expires, call `POST /api/auth/refresh` — the browser sends the cookie automatically. A new access token and rotated refresh cookie are returned.
 4. On logout, call `POST /api/auth/logout` to revoke the refresh token server-side.
 
+Username and password remain the sign-in credentials. Registration also collects an email address, which becomes a recovery address once verified. Changing a username or password reissues tokens and revokes every other session for that account.
+
 ### Roles
 
-| Role | Description |
-|---|---|
-| `User` | Default role for all registered users |
+| Role    | Description                                                                         |
+| ------- | ----------------------------------------------------------------------------------- |
+| `User`  | Default role for all registered users                                               |
 | `Admin` | Elevated access. Granted by setting `Role = 'Admin'` in the `Users` table directly. |
 
 ---
@@ -35,11 +37,13 @@ JeemzuAPI uses JWT Bearer tokens for authentication with httpOnly cookie-based r
 ### Auth — `/api/auth`
 
 #### `POST /api/auth/refresh`
+
 Silently exchanges a valid refresh token (httpOnly cookie) for a new access token. Rotates the refresh cookie.
 
 **Auth required:** No (reads cookie automatically)
 
 **Response `200`:**
+
 ```json
 {
   "accessToken": "eyJ...",
@@ -54,6 +58,7 @@ Silently exchanges a valid refresh token (httpOnly cookie) for a new access toke
 ---
 
 #### `POST /api/auth/logout`
+
 Revokes the refresh token and clears the cookie.
 
 **Auth required:** No
@@ -65,20 +70,25 @@ Revokes the refresh token and clears the cookie.
 ### Users — `/api/users`
 
 #### `POST /api/users/register`
-Creates a new user account and returns a JWT. Username must be unique.
+
+Creates a new user account and returns a JWT. Username must be unique. A verification link is emailed to the supplied address; registration still succeeds if delivery fails, but the address stays unverified and cannot be used for password recovery.
 
 **Auth required:** No
 
 **Request body:**
+
 ```json
 {
   "username": "string (required, max 50)",
+  "email": "string (required, valid email, max 256)",
   "password": "string (required, min 8, max 100)",
-  "optedIn": true
+  "optedIn": true,
+  "emailListSubscribed": false
 }
 ```
 
 **Response `201`:**
+
 ```json
 {
   "accessToken": "eyJ...",
@@ -93,11 +103,13 @@ Creates a new user account and returns a JWT. Username must be unique.
 ---
 
 #### `POST /api/users/login`
+
 Authenticates an existing user and returns a JWT. The role in the token reflects whatever `Role` is set on the user in the database.
 
 **Auth required:** No
 
 **Request body:**
+
 ```json
 {
   "username": "string (required)",
@@ -106,6 +118,7 @@ Authenticates an existing user and returns a JWT. The role in the token reflects
 ```
 
 **Response `200`:**
+
 ```json
 {
   "accessToken": "eyJ...",
@@ -120,14 +133,17 @@ Authenticates an existing user and returns a JWT. The role in the token reflects
 ---
 
 #### `POST /api/users`
-Updates the authenticated user's leaderboard opt-in preference. Username is taken from the JWT — not accepted from the request body.
+
+Updates the authenticated user's preferences. Username is taken from the JWT — not accepted from the request body. Omitted fields are left unchanged.
 
 **Auth required:** Yes — `Authorization: Bearer <token>`
 
 **Request body:**
+
 ```json
 {
-  "optedIn": true
+  "optedIn": true,
+  "emailListSubscribed": false
 }
 ```
 
@@ -137,12 +153,140 @@ Updates the authenticated user's leaderboard opt-in preference. Username is take
 
 ---
 
+#### `GET /api/users/me`
+
+Returns the signed-in user's own account settings, including private fields that `GET /api/users/{username}` never exposes.
+
+**Auth required:** Yes
+
+**Response `200`:** `ProfileResponse` (see below).
+
+---
+
+#### `POST /api/users/me/preferences`
+
+Same semantics as `POST /api/users`, but returns the full `ProfileResponse`.
+
+**Auth required:** Yes
+
+**Response `200`:** `ProfileResponse`.
+
+---
+
+#### `POST /api/users/me/username`
+
+Renames the account. Existing scores and RPG party rows are renamed in the same transaction, all refresh tokens are revoked, and a fresh token pair is issued.
+
+**Auth required:** Yes
+
+**Request body:**
+
+```json
+{ "username": "string (required, max 50)" }
+```
+
+**Response `200`:** `TokenResponse`.
+
+**Response `409`:** Username already taken.
+
+---
+
+#### `POST /api/users/me/password`
+
+Changes the password while signed in. Revokes all refresh tokens and returns a fresh token pair. Rate limited.
+
+**Auth required:** Yes
+
+**Request body:**
+
+```json
+{
+  "currentPassword": "string (required)",
+  "newPassword": "string (required, min 8, max 100)"
+}
+```
+
+**Response `200`:** `TokenResponse`.
+
+**Response `401`:** Current password is incorrect.
+
+---
+
+#### `POST /api/users/me/resend-verification`
+
+Issues a new verification link, invalidating any earlier one. No-op when the account has no address or is already verified. Rate limited.
+
+**Auth required:** Yes
+
+**Response `202`:** Accepted.
+
+---
+
+#### `POST /api/users/verify-email`
+
+Confirms an address using the token from the verification email. Tokens are single-use and expire after 24 hours. Rate limited.
+
+**Auth required:** No
+
+**Request body:**
+
+```json
+{ "token": "string (required)" }
+```
+
+**Response `204`:** Verified.
+
+**Response `400`:** Token invalid, expired, or already used.
+
+**Response `409`:** Address already verified on another account.
+
+---
+
+#### `POST /api/users/forgot-password`
+
+Sends a reset link, but only to an address that has already been verified. Rate limited.
+
+**Auth required:** No
+
+**Request body:**
+
+```json
+{ "email": "string (required, valid email)" }
+```
+
+**Response `202`:** Always returned — identical for unknown, unverified, and known addresses so the endpoint can't be used to discover registered emails.
+
+---
+
+#### `POST /api/users/reset-password`
+
+Sets a new password using the token from the reset email. Tokens are single-use and expire after 1 hour. All refresh tokens for the account are revoked. Rate limited.
+
+**Auth required:** No
+
+**Request body:**
+
+```json
+{
+  "token": "string (required)",
+  "newPassword": "string (required, min 8, max 100)"
+}
+```
+
+**Response `204`:** Password changed.
+
+**Response `400`:** Token invalid, expired, or already used.
+
+---
+
 #### `GET /api/users/{username}`
+
 Fetches a user's profile and their personal best score for each game they've played.
 
 **Auth required:** No
 
 **Response `200`:**
+
 ```json
 {
   "userId": "guid",
@@ -162,11 +306,13 @@ Fetches a user's profile and their personal best score for each game they've pla
 ### Scores — `/api/scores`
 
 #### `POST /api/scores`
+
 Submits a score for the authenticated user. Username is taken from the JWT — never trusted from the client. Enforces one score per user per game: if a score already exists for this `(user, gameId)` pair, it is updated only if the new score is higher. Lower or equal scores are silently ignored and the existing best is returned.
 
 **Auth required:** Yes — `Authorization: Bearer <token>`
 
 **Request body:**
+
 ```json
 {
   "gameId": "string (required, max 100, e.g. 'snake')",
@@ -178,6 +324,7 @@ Submits a score for the authenticated user. Username is taken from the JWT — n
 `gameId` is normalized to lowercase. `timestamp` is a Unix millisecond value supplied by the client.
 
 **Response `201`:** The stored (or existing best) `ScoreResponse`:
+
 ```json
 {
   "gameId": "snake",
@@ -192,26 +339,40 @@ Submits a score for the authenticated user. Username is taken from the JWT — n
 ---
 
 #### `GET /api/scores/{gameId}?limit=10`
+
 Returns the leaderboard for a game — top N scores across all users, sorted descending by score value. `limit` is clamped to 1–100, defaults to 10.
 
 **Auth required:** No
 
 **Response `200`:** Array of `ScoreResponse`:
+
 ```json
 [
-  { "gameId": "snake", "username": "alice", "score": 9800, "timestamp": 1750000000000 },
-  { "gameId": "snake", "username": "bob",   "score": 7200, "timestamp": 1749000000000 }
+  {
+    "gameId": "snake",
+    "username": "alice",
+    "score": 9800,
+    "timestamp": 1750000000000
+  },
+  {
+    "gameId": "snake",
+    "username": "bob",
+    "score": 7200,
+    "timestamp": 1749000000000
+  }
 ]
 ```
 
 ---
 
 #### `GET /api/scores/{gameId}/summary`
+
 Returns the all-time record for a game and, if the request is authenticated, the requesting user's personal best. Designed for populating game modal pre-game screens in a single call.
 
 **Auth required:** No (but include Bearer token to get `personalBest`)
 
 **Response `200`:**
+
 ```json
 {
   "allTimeRecord": {
@@ -232,7 +393,9 @@ Returns the all-time record for a game and, if the request is authenticated, the
 ## Data shapes
 
 ### `TokenResponse`
+
 Returned by register, login, and refresh endpoints.
+
 ```json
 {
   "accessToken": "string",
@@ -243,7 +406,9 @@ Returned by register, login, and refresh endpoints.
 ```
 
 ### `UserResponse`
+
 Returned by user profile and preference update endpoints.
+
 ```json
 {
   "userId": "guid",
@@ -253,8 +418,26 @@ Returned by user profile and preference update endpoints.
 }
 ```
 
+### `ProfileResponse`
+
+Returned by the `/api/users/me` endpoints. Only ever served to the account's owner.
+
+```json
+{
+  "username": "string",
+  "email": "string | null",
+  "emailVerified": false,
+  "optedIn": true,
+  "emailListSubscribed": false,
+  "role": "User | Admin",
+  "createdAt": "2026-01-01T00:00:00Z"
+}
+```
+
 ### `ScoreResponse`
+
 Returned by score submission and leaderboard endpoints.
+
 ```json
 {
   "gameId": "string",
@@ -265,7 +448,9 @@ Returned by score submission and leaderboard endpoints.
 ```
 
 ### `GameSummaryResponse`
+
 Returned by the summary endpoint.
+
 ```json
 {
   "allTimeRecord": "ScoreResponse | null",
@@ -277,29 +462,34 @@ Returned by the summary endpoint.
 
 ## Database schema (summary)
 
-| Table | Key columns |
-|---|---|
-| `Users` | `Id` (guid PK), `Username` (unique), `PasswordHash`, `Role`, `OptedIn` |
-| `Scores` | `Id` (guid PK), `GameId`, `Username`, `UserId` (FK → Users, nullable), `ScoreValue`, `Timestamp` — unique index on `(UserId, GameId)` where `UserId IS NOT NULL` |
-| `RefreshTokens` | `Id`, `Token` (unique), `Username`, `ExpiresAt`, `IsRevoked` |
+| Table           | Key columns                                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Users`         | `Id` (guid PK), `Username` (unique), `Email` (unique among verified addresses), `EmailVerifiedAt`, `EmailListSubscribed`, `PasswordHash`, `Role`, `OptedIn`               |
+| `UserTokens`    | `Id` (guid PK), `UserId` (FK → Users, cascade), `TokenHash` (SHA-256 of the emailed token), `Purpose` (`EmailVerification` \| `PasswordReset`), `ExpiresAt`, `ConsumedAt` |
+| `Scores`        | `Id` (guid PK), `GameId`, `Username`, `UserId` (FK → Users, nullable), `ScoreValue`, `Timestamp` — unique index on `(UserId, GameId)` where `UserId IS NOT NULL`          |
+| `RefreshTokens` | `Id`, `Token` (unique), `Username`, `ExpiresAt`, `IsRevoked`                                                                                                              |
 
 ---
 
 ## Environment variables (Azure App Service)
 
-| Variable | Purpose |
-|---|---|
-| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string |
-| `Jwt__Secret` | HMAC-SHA256 signing key (256-bit random) |
-| `Jwt__Issuer` | Token issuer claim (default: `jeemzu-api`) |
-| `Jwt__Audience` | Token audience claim (default: `jeemzu-frontend`) |
-| `WEBSITES_PORT` | Must be `8080` to match the container's listening port |
+| Variable                               | Purpose                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string                                             |
+| `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                 |
+| `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                               |
+| `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                        |
+| `Resend__ApiKey`                       | Enables contact, verification, and password reset email                  |
+| `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)            |
+| `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`) |
+| `WEBSITES_PORT`                        | Must be `8080` to match the container's listening port                   |
 
 ---
 
 ## CORS
 
 Allowed origins:
+
 - `https://jeemzu.me`
 - `https://www.jeemzu.me`
 - `http://localhost:5173` (Vite dev server)

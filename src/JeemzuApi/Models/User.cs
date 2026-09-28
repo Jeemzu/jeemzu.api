@@ -10,6 +10,18 @@ public class User
     /// <summary>Whether the player has opted into global leaderboards.</summary>
     public bool OptedIn { get; set; }
 
+    /// <summary>
+    /// Recovery address, stored lower-cased. Null for accounts created before
+    /// email was collected at registration.
+    /// </summary>
+    public string? Email { get; set; }
+
+    /// <summary>Set once the user follows their verification link. Password reset requires this.</summary>
+    public DateTimeOffset? EmailVerifiedAt { get; set; }
+
+    /// <summary>Whether the user opted into the notification mailing list.</summary>
+    public bool EmailListSubscribed { get; set; }
+
     /// <summary>Role for authorization. Valid values: "User", "Admin". Default: "User".</summary>
     public string Role { get; set; } = "User";
 

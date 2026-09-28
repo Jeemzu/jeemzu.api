@@ -10,6 +10,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Resend;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,14 +60,41 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
-// Resend email service — used by POST /api/contact
+// Resend email service — used by POST /api/contact and the account verification/reset emails.
 // Key is optional at startup; EmailService will return 503 if unconfigured.
 builder.Services.AddResend(options =>
 {
     options.ApiToken = builder.Configuration["Resend:ApiKey"] ?? string.Empty;
 });
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Throttle account recovery endpoints so password guesses and reset emails can't be ground through.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Signed-in actions partition by username, so one user can never throttle another.
+    options.AddPolicy("account-user", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.Identity?.Name ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(5),
+        }));
+
+    // Anonymous recovery endpoints can only partition by IP. Behind a reverse proxy that
+    // may group callers together, so the limit is loose enough to avoid locking out real
+    // users — token entropy, not this limiter, is what makes the links unguessable.
+    options.AddPolicy("account-public", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(5),
+        }));
+});
 
 // RPG multiplayer — SignalR for real-time party/gameplay, Party service for lobby
 // management, Turn service for combat turn validation/timeouts, and an HTTP proxy
@@ -184,6 +212,8 @@ app.UseSwaggerUI();
 
 app.UseCors("JeemzuFrontend");
 app.UseAuthentication();
+// After authentication so the "account-user" policy can partition by username.
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // Lightweight health endpoint — useful for Azure App Service health probes

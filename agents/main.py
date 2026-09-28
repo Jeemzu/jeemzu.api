@@ -16,7 +16,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",   # Vite dev server
-        "http://localhost:5000",   # .NET API
+        "http://localhost:5050",   # .NET API
         "https://jeemzu.me",
         "https://www.jeemzu.me",
     ],

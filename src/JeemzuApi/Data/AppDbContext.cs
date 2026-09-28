@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
     public DbSet<Party> Parties => Set<Party>();
@@ -74,6 +75,25 @@ public class AppDbContext : DbContext
             entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
             // Unique index so no two players can share a username
             entity.HasIndex(u => u.Username).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(256);
+            // Only verified addresses are reserved — an unverified signup can't squat someone else's email
+            entity.HasIndex(u => u.Email)
+                  .IsUnique()
+                  .HasFilter("\"Email\" IS NOT NULL AND \"EmailVerifiedAt\" IS NOT NULL");
+        });
+
+        // UserToken configuration — email verification and password reset
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(t => t.Purpose).IsRequired().HasMaxLength(30);
+            entity.HasIndex(t => new { t.TokenHash, t.Purpose });
+            entity.HasIndex(t => t.UserId);
+            entity.HasOne(t => t.User)
+                  .WithMany()
+                  .HasForeignKey(t => t.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // RefreshToken configuration

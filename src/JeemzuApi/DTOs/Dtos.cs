@@ -50,12 +50,15 @@ public class GameSummaryResponse
 // ── Users ────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Request body for POST /api/users.
-/// Username is taken from the JWT claim — only OptedIn is accepted from the client.
+/// Request body for POST /api/users and POST /api/users/me/preferences.
+/// Username is taken from the JWT claim. Omitted fields are left unchanged.
 /// </summary>
 public class UpdateUserRequest
 {
-    public bool OptedIn { get; set; }
+    public bool? OptedIn { get; set; }
+
+    /// <summary>Opt in/out of the notification mailing list.</summary>
+    public bool? EmailListSubscribed { get; set; }
 }
 
 /// <summary>Request body for POST /api/users/register.</summary>
@@ -65,12 +68,83 @@ public class RegisterRequest
     [MaxLength(50)]
     public string Username { get; set; } = string.Empty;
 
+    /// <summary>Recovery address. Must be verified before it can reset the password.</summary>
+    [Required]
+    [EmailAddress]
+    [MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+
     [Required]
     [MinLength(8)]
     [MaxLength(100)]
     public string Password { get; set; } = string.Empty;
 
     public bool OptedIn { get; set; }
+
+    public bool EmailListSubscribed { get; set; }
+}
+
+/// <summary>Request body for POST /api/users/me/username.</summary>
+public class ChangeUsernameRequest
+{
+    [Required]
+    [MaxLength(50)]
+    public string Username { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/me/password.</summary>
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(100)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/forgot-password.</summary>
+public class ForgotPasswordRequest
+{
+    [Required]
+    [EmailAddress]
+    [MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/reset-password.</summary>
+public class ResetPasswordRequest
+{
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(100)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/verify-email.</summary>
+public class VerifyEmailRequest
+{
+    [Required]
+    public string Token { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Returned from the authenticated /api/users/me endpoints. Unlike UserResponse
+/// this includes private account settings, so it is never served for another user.
+/// </summary>
+public class ProfileResponse
+{
+    public string Username { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public bool EmailVerified { get; set; }
+    public bool OptedIn { get; set; }
+    public bool EmailListSubscribed { get; set; }
+    public string Role { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>

@@ -4,7 +4,7 @@ namespace JeemzuApi.Services;
 
 public interface IUserService
 {
-    /// <summary>Updates OptedIn preference for an existing authenticated user.</summary>
+    /// <summary>Updates the preferences supplied on the request; omitted fields are left unchanged.</summary>
     Task<UserResponse> UpdatePreferencesAsync(string username, UpdateUserRequest request);
 
     /// <summary>Returns null when the username does not exist.</summary>
