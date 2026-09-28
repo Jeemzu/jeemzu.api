@@ -10,12 +10,12 @@ using Microsoft.EntityFrameworkCore;
 namespace JeemzuApi.Controllers;
 
 /// <summary>
-/// Load and save the authenticated admin's personal budget. Each admin has their
+/// Load and save the authenticated user's personal budget. Each user has their
 /// own budget — the owner is always taken from the JWT, never from the request.
 /// </summary>
 [ApiController]
-[Route("api/admin/budget")]
-[Authorize(Roles = "Admin")]
+[Route("api/budget")]
+[Authorize]
 public class BudgetController : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -27,7 +27,7 @@ public class BudgetController : ControllerBase
         _db = db;
     }
 
-    /// <summary>Returns the saved budget, or 404 when the admin has not saved one yet.</summary>
+    /// <summary>Returns the saved budget, or 404 when the user has not saved one yet.</summary>
     [HttpGet]
     public async Task<ActionResult<BudgetSnapshotResponse>> GetBudget(CancellationToken ct)
     {
