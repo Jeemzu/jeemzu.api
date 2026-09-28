@@ -20,6 +20,25 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 | Database (dev) | Docker Compose (`postgres:16-alpine`, port 5432) |
 | CI/CD | GitHub Actions → ACR → Azure App Service |
 
+## Third-Party Services
+
+| Service | Responsibility |
+|---|---|
+| Azure App Service | Runs the ASP.NET Core API container that serves the website's backend requests. |
+| Azure Container Registry (ACR) | Stores API container images published by the deployment workflow for Azure App Service. |
+| Azure Database for PostgreSQL | Production database for users, scores, refresh tokens, and knowledge chunks. The `vector` extension with pgvector supports semantic search over knowledge embeddings. |
+| OpenAI | Supplies chat completions and text embeddings to the .NET RAG API and Python agents. API keys are provided through deployment configuration. |
+| Render | Hosts the Python chat-agent endpoint configured by the frontend. The site tries the agent before falling back to the .NET chat endpoint; the API also exposes an optional agent health check. |
+| Tavily | Optional web-search provider used by the general-purpose Python agent for current or general-topic queries; requires `TAVILY_API_KEY`. |
+| Resend | Optional email provider used by `POST /api/contact` when `Resend:ApiKey` is configured. |
+| GitHub Actions | Builds the API container, pushes it to ACR, and dispatches `api-types-update` to the frontend repo. This is deployment/type-generation automation, not a runtime service. |
+
+Production API and agent URLs are supplied by deployment configuration. The production hostname in [API.md](API.md) differs from the frontend's configured `VITE_API_URL`; verify the intended public endpoint before treating either reference as canonical.
+
+### Local-Only Infrastructure
+
+Docker Compose starts PostgreSQL and the general-purpose and RPG Python agent services for local development. These Compose definitions do not establish where the agent services are hosted in production; the Render endpoint used by the site is configured separately.
+
 ## API Endpoints
 
 ### Auth — `/api/auth`
