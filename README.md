@@ -4,34 +4,34 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 
 ## Stack
 
-| Concern | Technology |
-|---|---|
-| Framework | ASP.NET Core 8 (controller-based) |
-| ORM | Entity Framework Core 8 (Npgsql) |
-| Database | PostgreSQL 16 + pgvector (HNSW cosine index) |
-| AI/LLM | Semantic Kernel 1.77 — GPT-4o-mini + text-embedding-3-small |
-| Agent service | Python 3.11, FastAPI, LangGraph, LangChain |
-| Auth | JWT Bearer (HMAC-SHA256, 60 min) + httpOnly refresh cookie (30 days) |
-| Password hashing | BCrypt (work factor 12) |
-| API docs | Swagger/OpenAPI (Swashbuckle) |
-| Containerization | Docker multi-stage (runtime: port 8080) |
-| Hosting | Azure App Service + Azure Container Registry |
-| Database (prod) | Azure Database for PostgreSQL Flexible Server |
-| Database (dev) | Docker Compose (`postgres:16-alpine`, port 5432) |
-| CI/CD | GitHub Actions → ACR → Azure App Service |
+| Concern          | Technology                                                           |
+| ---------------- | -------------------------------------------------------------------- |
+| Framework        | ASP.NET Core 8 (controller-based)                                    |
+| ORM              | Entity Framework Core 8 (Npgsql)                                     |
+| Database         | PostgreSQL 16 + pgvector (HNSW cosine index)                         |
+| AI/LLM           | Semantic Kernel 1.77 — GPT-4o-mini + text-embedding-3-small          |
+| Agent service    | Python 3.11, FastAPI, LangGraph, LangChain                           |
+| Auth             | JWT Bearer (HMAC-SHA256, 60 min) + httpOnly refresh cookie (30 days) |
+| Password hashing | BCrypt (work factor 12)                                              |
+| API docs         | Swagger/OpenAPI (Swashbuckle)                                        |
+| Containerization | Docker multi-stage (runtime: port 8080)                              |
+| Hosting          | Azure App Service + Azure Container Registry                         |
+| Database (prod)  | Azure Database for PostgreSQL Flexible Server                        |
+| Database (dev)   | Docker Compose (`postgres:16-alpine`, port 5432)                     |
+| CI/CD            | GitHub Actions → ACR → Azure App Service                             |
 
 ## Third-Party Services
 
-| Service | Responsibility |
-|---|---|
-| Azure App Service | Runs the ASP.NET Core API container that serves the website's backend requests. |
-| Azure Container Registry (ACR) | Stores API container images published by the deployment workflow for Azure App Service. |
-| Azure Database for PostgreSQL | Production database for users, scores, refresh tokens, and knowledge chunks. The `vector` extension with pgvector supports semantic search over knowledge embeddings. |
-| OpenAI | Supplies chat completions and text embeddings to the .NET RAG API and Python agents. API keys are provided through deployment configuration. |
-| Render | Hosts the Python chat-agent endpoint configured by the frontend. The site tries the agent before falling back to the .NET chat endpoint; the API also exposes an optional agent health check. |
-| Tavily | Optional web-search provider used by the general-purpose Python agent for current or general-topic queries; requires `TAVILY_API_KEY`. |
-| Resend | Optional email provider used by `POST /api/contact` when `Resend:ApiKey` is configured. |
-| GitHub Actions | Builds the API container, pushes it to ACR, and dispatches `api-types-update` to the frontend repo. This is deployment/type-generation automation, not a runtime service. |
+| Service                        | Responsibility                                                                                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Azure App Service              | Runs the ASP.NET Core API container that serves the website's backend requests.                                                                                                               |
+| Azure Container Registry (ACR) | Stores API container images published by the deployment workflow for Azure App Service.                                                                                                       |
+| Azure Database for PostgreSQL  | Production database for users, scores, refresh tokens, and knowledge chunks. The `vector` extension with pgvector supports semantic search over knowledge embeddings.                         |
+| OpenAI                         | Supplies chat completions and text embeddings to the .NET RAG API and Python agents. API keys are provided through deployment configuration.                                                  |
+| Render                         | Hosts the Python chat-agent endpoint configured by the frontend. The site tries the agent before falling back to the .NET chat endpoint; the API also exposes an optional agent health check. |
+| Tavily                         | Optional web-search provider used by the general-purpose Python agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                        |
+| Resend                         | Optional email provider used by `POST /api/contact` when `Resend:ApiKey` is configured.                                                                                                       |
+| GitHub Actions                 | Builds the API container, pushes it to ACR, and dispatches `api-types-update` to the frontend repo. This is deployment/type-generation automation, not a runtime service.                     |
 
 Production API and agent URLs are supplied by deployment configuration. The production hostname in [API.md](API.md) differs from the frontend's configured `VITE_API_URL`; verify the intended public endpoint before treating either reference as canonical.
 
@@ -43,53 +43,53 @@ Docker Compose starts PostgreSQL and the general-purpose and RPG Python agent se
 
 ### Auth — `/api/auth`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
+| Method | Path                | Auth | Description                                                           |
+| ------ | ------------------- | ---- | --------------------------------------------------------------------- |
 | `POST` | `/api/auth/refresh` | None | Reads httpOnly cookie → validates & rotates → returns `TokenResponse` |
-| `POST` | `/api/auth/logout` | None | Revokes token, deletes cookie → `204` |
+| `POST` | `/api/auth/logout`  | None | Revokes token, deletes cookie → `204`                                 |
 
 ### Users — `/api/users`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/users/register` | None | Creates account → `201 TokenResponse` (sets refresh cookie) |
-| `POST` | `/api/users/login` | None | Authenticates → `TokenResponse` (sets refresh cookie) |
-| `POST` | `/api/users` | Bearer | Updates `OptedIn` for authenticated user → `UserResponse` |
-| `GET` | `/api/users/{username}` | None | User profile + per-game high scores |
+| Method | Path                    | Auth   | Description                                                 |
+| ------ | ----------------------- | ------ | ----------------------------------------------------------- |
+| `POST` | `/api/users/register`   | None   | Creates account → `201 TokenResponse` (sets refresh cookie) |
+| `POST` | `/api/users/login`      | None   | Authenticates → `TokenResponse` (sets refresh cookie)       |
+| `POST` | `/api/users`            | Bearer | Updates `OptedIn` for authenticated user → `UserResponse`   |
+| `GET`  | `/api/users/{username}` | None   | User profile + per-game high scores                         |
 
 ### Scores — `/api/scores`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/scores` | Bearer | Submit score (upserts — only updates if higher) → `201 ScoreResponse` |
-| `GET` | `/api/scores/{gameId}?limit=10` | None | Top-N leaderboard (limit clamped 1–100) |
-| `GET` | `/api/scores/{gameId}/summary` | Optional | All-time record + personal best (when authenticated) |
+| Method | Path                            | Auth     | Description                                                           |
+| ------ | ------------------------------- | -------- | --------------------------------------------------------------------- |
+| `POST` | `/api/scores`                   | Bearer   | Submit score (upserts — only updates if higher) → `201 ScoreResponse` |
+| `GET`  | `/api/scores/{gameId}?limit=10` | None     | Top-N leaderboard (limit clamped 1–100)                               |
+| `GET`  | `/api/scores/{gameId}/summary`  | Optional | All-time record + personal best (when authenticated)                  |
 
 ### Chat — `/api/chat`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
+| Method | Path        | Auth | Description                                                        |
+| ------ | ----------- | ---- | ------------------------------------------------------------------ |
 | `POST` | `/api/chat` | None | RAG chat — accepts `{ question, history[] }`, returns `{ answer }` |
 
 ### Admin — `/api/admin`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
+| Method | Path                          | Auth  | Description                                                          |
+| ------ | ----------------------------- | ----- | -------------------------------------------------------------------- |
 | `POST` | `/api/admin/knowledge/ingest` | Admin | Re-reads `about-me.json`, regenerates embeddings, upserts all chunks |
-| `GET` | `/api/admin/users` | Admin | List all users |
-| `PUT` | `/api/admin/users/{id}/role` | Admin | Update user role |
+| `GET`  | `/api/admin/users`            | Admin | List all users                                                       |
+| `PUT`  | `/api/admin/users/{id}/role`  | Admin | Update user role                                                     |
 
 ### Knowledge — `/api/knowledge`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/knowledge/search?q=...` | None | Vector similarity search against knowledge base |
+| Method | Path                          | Auth | Description                                     |
+| ------ | ----------------------------- | ---- | ----------------------------------------------- |
+| `GET`  | `/api/knowledge/search?q=...` | None | Vector similarity search against knowledge base |
 
 ### Health
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | PostgreSQL connectivity check |
+| Method | Path      | Description                   |
+| ------ | --------- | ----------------------------- |
+| `GET`  | `/health` | PostgreSQL connectivity check |
 
 ## Agent Service (Python)
 
@@ -113,22 +113,22 @@ Synthesizer (combines outputs) → final answer
 
 ### Agent Nodes
 
-| Node | Purpose |
-|---|---|
-| `router` | Classifies query → selects agents to invoke |
-| `knowledge` | Answers about James's skills, experience, projects, education |
-| `game_stats` | Live leaderboard queries, game scores, user profiles |
-| `web_search` | External search for general topics and current events |
-| `synthesizer` | Combines all agent outputs into a coherent response |
+| Node          | Purpose                                                       |
+| ------------- | ------------------------------------------------------------- |
+| `router`      | Classifies query → selects agents to invoke                   |
+| `knowledge`   | Answers about James's skills, experience, projects, education |
+| `game_stats`  | Live leaderboard queries, game scores, user profiles          |
+| `web_search`  | External search for general topics and current events         |
+| `synthesizer` | Combines all agent outputs into a coherent response           |
 
 ### Tools
 
-| Tool | Target |
-|---|---|
-| `knowledge_tool` | Vector search against `KnowledgeChunk` table |
-| `scores_tool` | `GET /api/scores/{gameId}`, `GET /api/scores/{gameId}/summary` |
-| `users_tool` | `GET /api/users/{username}` |
-| `web_search_tool` | Tavily web search API |
+| Tool              | Target                                                         |
+| ----------------- | -------------------------------------------------------------- |
+| `knowledge_tool`  | Vector search against `KnowledgeChunk` table                   |
+| `scores_tool`     | `GET /api/scores/{gameId}`, `GET /api/scores/{gameId}/summary` |
+| `users_tool`      | `GET /api/users/{username}`                                    |
+| `web_search_tool` | Tavily web search API                                          |
 
 ## Database Schema
 
@@ -137,6 +137,7 @@ Synthesizer (combines outputs) → final answer
 **User** — `Id`, `Username` (unique, max 50), `PasswordHash` (BCrypt), `Role` (`"User"` | `"Admin"`), `OptedIn`, `CreatedAt`, `UpdatedAt`
 
 **Score** — `Id`, `GameId`, `Username`, `UserId` (nullable FK → User, on delete SetNull), `ScoreValue`, `Timestamp` (Unix ms), `CreatedAt`
+
 - Index: `(GameId, ScoreValue)`
 - Unique filtered: `(UserId, GameId) WHERE UserId IS NOT NULL`
 
@@ -189,15 +190,15 @@ Dockerfile                   # .NET API multi-stage build
 
 ## Service Layer
 
-| Service | Responsibility |
-|---|---|
-| `AuthService` | JWT issuance, BCrypt hashing, token rotation, cookie management |
-| `ScoreService` | Score upsert (only if higher), leaderboard queries |
-| `UserService` | Profile management, preferences, high score aggregation |
-| `ChatService` | RAG pipeline — embed → retrieve → build prompt → LLM |
-| `EmbeddingService` | Generate 1536-dim vectors via Semantic Kernel |
-| `VectorStoreService` | pgvector cosine similarity queries |
-| `IngestionService` | Parse `about-me.json` → chunk → embed → upsert by SourceKey |
+| Service              | Responsibility                                                  |
+| -------------------- | --------------------------------------------------------------- |
+| `AuthService`        | JWT issuance, BCrypt hashing, token rotation, cookie management |
+| `ScoreService`       | Score upsert (only if higher), leaderboard queries              |
+| `UserService`        | Profile management, preferences, high score aggregation         |
+| `ChatService`        | RAG pipeline — embed → retrieve → build prompt → LLM            |
+| `EmbeddingService`   | Generate 1536-dim vectors via Semantic Kernel                   |
+| `VectorStoreService` | pgvector cosine similarity queries                              |
+| `IngestionService`   | Parse `about-me.json` → chunk → embed → upsert by SourceKey     |
 
 All business services are **scoped**. AI services (`Kernel`, `IChatCompletionService`, `IEmbeddingGenerator`) are **singleton**.
 
@@ -216,6 +217,7 @@ docker compose up -d
 ```
 
 Starts:
+
 - PostgreSQL 16 on port **5432** (`jeemzu` / `jeemzu_dev_password` / `jeemzu_db`)
 - Agents service on port **8001** (FastAPI + LangGraph)
 
@@ -268,6 +270,7 @@ dotnet tool install --global dotnet-ef
 ### CI/CD (GitHub Actions)
 
 On push to `main`:
+
 1. Builds Docker image
 2. Pushes to Azure Container Registry (`jeemzuregistry.azurecr.io/jeemzu-api`)
 3. Tags: `:{git-sha}` + `:latest`
@@ -276,6 +279,7 @@ On push to `main`:
 ### Azure Configuration
 
 App Service env vars:
+
 - `ConnectionStrings__DefaultConnection` — Azure PostgreSQL connection string
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
 - `OpenAI__ApiKey`
