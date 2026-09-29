@@ -33,37 +33,5 @@ services:
     depends_on:
       - postgres
 
-  rpg:
-    build:
-      context: ./agents/rpg
-      dockerfile: Dockerfile
-    container_name: jeemzu_rpg
-    ports:
-      - "8002:8002"
-    env_file:
-      - ./agents/rpg/.env
-    environment:
-      DOTNET_API_URL: http://host.docker.internal:5050/api
-    volumes:
-      - ./agents/rpg:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
-    depends_on:
-      - postgres
-
-  budget:
-    build:
-      context: ./agents/budget
-      dockerfile: Dockerfile
-    container_name: jeemzu_budget
-    ports:
-      - "8003:8003"
-    env_file:
-      - ./agents/budget/.env
-    environment:
-      DOTNET_API_URL: http://host.docker.internal:5050/api
-    volumes:
-      - ./agents/budget:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8003 --reload
-
 volumes:
   jeemzu_pgdata:

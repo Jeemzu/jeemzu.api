@@ -1,5 +1,4 @@
 using JeemzuApi.Data;
-using JeemzuApi.Hubs;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -49,7 +48,7 @@ builder.Services.AddSwaggerGen(c =>
 // EF Core — Npgsql (PostgreSQL)
 // Connection string comes from:
 //   Development : dotnet user-secrets ("ConnectionStrings:DefaultConnection")
-//   Production  : Azure App Service environment variable
+//   Production  : Render environment variable, in Npgsql keyword form (not a postgres:// URI)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
@@ -96,27 +95,12 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
-// RPG multiplayer — SignalR for real-time party/gameplay, Party service for lobby
-// management, Turn service for combat turn validation/timeouts, and an HTTP proxy
-// to the separate Python LangGraph RPG orchestration service.
-builder.Services.AddSignalR();
-builder.Services.AddScoped<IPartyService, PartyService>();
-builder.Services.AddScoped<ICampaignService, CampaignService>();
-builder.Services.AddSingleton<ITurnService, TurnService>();
-
-var rpgServiceUrl = builder.Configuration["Rpg:ServiceUrl"] ?? "http://localhost:8001";
-builder.Services.AddHttpClient<IRpgProxyService, RpgProxyService>(client =>
-{
-    client.BaseAddress = new Uri(rpgServiceUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
-
-// Budgetize assistant — a separate LangGraph service. The planner node can take a
-// while on a large budget, so this gets a longer timeout than the RPG proxy.
-var budgetAgentUrl = builder.Configuration["Budget:AgentUrl"] ?? "http://localhost:8003";
+// Python agent service — one FastAPI app serving both the chatbot and the Budgetize
+// assistant. The planner node can take a while on a large budget, so the timeout is generous.
+var agentsBaseUrl = builder.Configuration["Agents:BaseUrl"] ?? "http://localhost:8001";
 builder.Services.AddHttpClient<IBudgetAgentProxyService, BudgetAgentProxyService>(client =>
 {
-    client.BaseAddress = new Uri(budgetAgentUrl);
+    client.BaseAddress = new Uri(agentsBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
@@ -164,21 +148,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
-
-        // SignalR WebSocket/SSE connections can't set an Authorization header, so the
-        // JS client sends the access token via query string instead — extract it here.
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
-                {
-                    context.Token = accessToken;
-                }
-                return Task.CompletedTask;
-            }
-        };
     });
 
 builder.Services.AddAuthorization();
@@ -208,12 +177,33 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Auto-apply any pending EF migrations at startup.
-// This means a fresh Azure deploy automatically creates/updates the schema.
+// Apply pending EF migrations, then seed, so a fresh deploy comes up ready to serve.
+// Render's managed Postgres can refuse the first connection or two while a newly deployed
+// container starts, hence the bounded retry. A retrying EF execution strategy is deliberately
+// NOT used: it forbids the user-initiated transaction in AccountService.ChangeUsernameAsync.
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var sp = scope.ServiceProvider;
+    var startupLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+
+    const int maxAttempts = 5;
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await sp.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+            await DbSeeder.SeedAsync(sp);
+            break;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            var delay = TimeSpan.FromSeconds(2 * attempt);
+            startupLogger.LogWarning(ex,
+                "Database startup attempt {Attempt}/{Max} failed; retrying in {Delay}s.",
+                attempt, maxAttempts, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
 }
 
 app.UseSwagger();
@@ -225,10 +215,9 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 
-// Lightweight health endpoint — useful for Azure App Service health probes
+// Lightweight health endpoint — also used as the Render health check path
 app.MapHealthChecks("/health");
 
 app.MapControllers();
-app.MapHub<GameHub>("/hubs/game");
 
 app.Run();

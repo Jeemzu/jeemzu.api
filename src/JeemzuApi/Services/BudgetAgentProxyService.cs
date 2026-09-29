@@ -5,9 +5,9 @@ using JeemzuApi.DTOs;
 namespace JeemzuApi.Services;
 
 /// <summary>
-/// HTTP proxy to the Python Budgetize assistant service. Unlike the RPG service,
-/// this one already speaks the browser's camelCase contract, so proposals pass
-/// straight through as raw JSON instead of being remapped twice.
+/// HTTP proxy to the Python Budgetize assistant service. It already speaks the
+/// browser's camelCase contract, so proposals pass straight through as raw JSON
+/// instead of being remapped twice.
 /// </summary>
 public class BudgetAgentProxyService : IBudgetAgentProxyService
 {

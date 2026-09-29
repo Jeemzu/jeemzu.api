@@ -165,11 +165,11 @@ public class AdminController : ControllerBase
         }
         results.Add(dbStatus);
 
-        // Agent service (Render)
-        var agentUrl = _configuration["AgentServiceUrl"];
+        // Python agent service, reachable only over the private network
+        var agentUrl = _configuration["Agents:BaseUrl"];
         if (!string.IsNullOrEmpty(agentUrl))
         {
-            var agentStatus = new ServiceHealthStatus { Service = "Agent (Render)" };
+            var agentStatus = new ServiceHealthStatus { Service = "Agents" };
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };

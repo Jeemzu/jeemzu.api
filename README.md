@@ -15,29 +15,27 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 | Password hashing | BCrypt (work factor 12)                                              |
 | API docs         | Swagger/OpenAPI (Swashbuckle)                                        |
 | Containerization | Docker multi-stage (runtime: port 8080)                              |
-| Hosting          | Azure App Service + Azure Container Registry                         |
-| Database (prod)  | Azure Database for PostgreSQL Flexible Server                        |
-| Database (dev)   | Docker Compose (`postgres:16-alpine`, port 5432)                     |
-| CI/CD            | GitHub Actions → ACR → Azure App Service                             |
+| Hosting          | Render (Docker web service + private service)                        |
+| Database (prod)  | Render Managed PostgreSQL 16 + pgvector                              |
+| Database (dev)   | Docker Compose (`pgvector/pgvector:pg16`, port 5432)                 |
+| CI/CD            | Render auto-deploy from `main` (see `render.yaml`)                   |
 
 ## Third-Party Services
 
-| Service                        | Responsibility                                                                                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Azure App Service              | Runs the ASP.NET Core API container that serves the website's backend requests.                                                                                                               |
-| Azure Container Registry (ACR) | Stores API container images published by the deployment workflow for Azure App Service.                                                                                                       |
-| Azure Database for PostgreSQL  | Production database for users, scores, refresh tokens, and knowledge chunks. The `vector` extension with pgvector supports semantic search over knowledge embeddings.                         |
-| OpenAI                         | Supplies chat completions and text embeddings to the .NET RAG API and Python agents. API keys are provided through deployment configuration.                                                  |
-| Render                         | Hosts the Python chat-agent endpoint configured by the frontend. The site tries the agent before falling back to the .NET chat endpoint; the API also exposes an optional agent health check. |
-| Tavily                         | Optional web-search provider used by the general-purpose Python agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                        |
-| Resend                         | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                             |
-| GitHub Actions                 | Builds the API container, pushes it to ACR, and dispatches `api-types-update` to the frontend repo. This is deployment/type-generation automation, not a runtime service.                     |
+| Service           | Responsibility                                                                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Render            | Hosts everything: the ASP.NET Core API as a public web service at `api.jeemzu.me`, the Python agents as a private service with no public hostname, and managed PostgreSQL. Defined in `render.yaml`. |
+| Render PostgreSQL | Production database for users, scores, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
+| OpenAI            | Supplies chat completions and text embeddings to the .NET RAG API and the Python agents. API keys are provided through deployment configuration.                                                     |
+| Tavily            | Optional web-search provider used by the chatbot agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                                              |
+| Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
+| GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
 
-Production API and agent URLs are supplied by deployment configuration. The production hostname in [API.md](API.md) differs from the frontend's configured `VITE_API_URL`; verify the intended public endpoint before treating either reference as canonical.
+The agents service is reachable only over Render's private network; the browser never calls it directly.
 
 ### Local-Only Infrastructure
 
-Docker Compose starts PostgreSQL and the general-purpose and RPG Python agent services for local development. These Compose definitions do not establish where the agent services are hosted in production; the Render endpoint used by the site is configured separately.
+Docker Compose starts PostgreSQL and the Python agents service for local development.
 
 ## API Endpoints
 
@@ -185,7 +183,7 @@ agents/                      # Python multi-agent service
 
 docker-compose.yml           # PostgreSQL + agents service
 Dockerfile                   # .NET API multi-stage build
-.github/workflows/deploy.yml # CI/CD → Azure
+.github/workflows/deploy.yml # Notifies the frontend to regenerate API types
 ```
 
 ## Service Layer
@@ -275,25 +273,32 @@ dotnet tool install --global dotnet-ef
 
 ## Deployment
 
+### Render
+
+`render.yaml` defines the whole stack: the public `jeemzu-api` web service, the private
+`jeemzu-agents` service, and the managed PostgreSQL instance. All three live in the same region so
+the private network resolves. Pushing to `main` triggers an auto-deploy of both services.
+
+Secrets are marked `sync: false` in the Blueprint, so their values live in the Render dashboard and
+are never committed.
+
 ### CI/CD (GitHub Actions)
 
-On push to `main`:
+On push to `main`, the workflow only dispatches `api-types-update` to the `jeemzu.me` repo so the
+frontend regenerates its OpenAPI types. Render builds and deploys the containers itself.
 
-1. Builds Docker image
-2. Pushes to Azure Container Registry (`jeemzuregistry.azurecr.io/jeemzu-api`)
-3. Tags: `:{git-sha}` + `:latest`
-4. Dispatches `api-types-update` event to `jeemzu.me` repo (regenerates frontend OpenAPI types)
+### Render Configuration
 
-### Azure Configuration
+Service env vars:
 
-App Service env vars:
-
-- `ConnectionStrings__DefaultConnection` — Azure PostgreSQL connection string
+- `ConnectionStrings__DefaultConnection` — Npgsql keyword form; Render's `postgres://` URI will not parse
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
 - `OpenAI__ApiKey`
+- `Agents__BaseUrl` — private-network address of the agents service
 - `Resend__ApiKey`, `Resend__AccountFrom` — account verification and password reset email
 - `Frontend__BaseUrl` — base URL used to build verification and reset links
-- `WEBSITES_PORT=8080`
+- `Seed__AdminUsername`, `Seed__AdminEmail`, `Seed__AdminPassword` — one-time admin bootstrap
+- `PORT=8080`
 - `ASPNETCORE_ENVIRONMENT=Production`
 
 ### CORS

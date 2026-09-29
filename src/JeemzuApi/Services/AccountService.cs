@@ -62,12 +62,6 @@ public class AccountService : IAccountService
 
             await _db.Scores.Where(s => s.Username == username)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.Username, newUsername));
-            await _db.PartyMembers.Where(m => m.Username == username)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Username, newUsername));
-            await _db.PartyMembers.Where(m => m.ControlledByUsername == username)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.ControlledByUsername, newUsername));
-            await _db.Parties.Where(p => p.CurrentTurnUsername == username)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CurrentTurnUsername, newUsername));
 
             await tx.CommitAsync();
         }

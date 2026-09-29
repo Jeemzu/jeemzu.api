@@ -106,7 +106,7 @@ public class AuthService : IAuthService
         {
             HttpOnly = true,
             Secure = isProduction,
-            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Lax,
+            SameSite = SameSiteMode.Lax,
             Path = "/api/auth"
         });
     }
@@ -126,14 +126,16 @@ public class AuthService : IAuthService
         var accessToken = BuildAccessToken(username, role);
         var refreshToken = await StoreRefreshTokenAsync(username);
 
-        // In development (HTTP), Secure=true + SameSite=None prevents the browser from
-        // storing the cookie. Use Lax/Secure=false locally so the full auth flow works.
+        // Secure must stay off in development (HTTP) or the browser drops the cookie.
+        // SameSite=Lax requires the API to be same-site with the frontend: it is served from
+        // api.jeemzu.me, which shares the jeemzu.me registrable domain. Pointing the frontend
+        // at a *.onrender.com hostname instead would make this cross-site and break refresh.
         var isProduction = !_env.IsDevelopment();
         response.Cookies.Append(RefreshTokenCookie, refreshToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = isProduction,
-            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Lax,
+            SameSite = SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddDays(RefreshTokenDays),
             Path = "/api/auth"
         });

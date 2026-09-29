@@ -1,7 +1,7 @@
 [project]
 name = "jeemzu-agents"
-version = "0.1.0"
-description = "Multi-agent orchestration layer for jeemzu.me chatbot"
+version = "0.2.0"
+description = "Multi-agent orchestration for the jeemzu.me chatbot and the Budgetize assistant"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
@@ -14,3 +14,11 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv>=1.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
