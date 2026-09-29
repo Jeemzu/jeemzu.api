@@ -472,22 +472,22 @@ Returned by the summary endpoint.
 
 ## Environment variables (Render)
 
-| Variable                               | Purpose                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------ |
+| Variable                               | Purpose                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------ |
 | `ConnectionStrings__DefaultConnection` | PostgreSQL connection string, in Npgsql keyword form (not a `postgres://` URI) |
-| `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                 |
-| `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                               |
-| `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                        |
-| `OpenAI__ApiKey`                       | Chat completions and embeddings                                          |
-| `Agents__BaseUrl`                      | Private-network address of the Python agents service                     |
-| `InternalApiKey`                       | Shared secret the agents service sends as `X-Internal-Key`               |
-| `Resend__ApiKey`                       | Enables contact, verification, and password reset email                  |
-| `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)            |
-| `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`) |
-| `Seed__AdminUsername`                  | One-time admin bootstrap; the seeder no-ops once the user exists         |
-| `Seed__AdminEmail`                     | Email for the seeded admin account                                       |
-| `Seed__AdminPassword`                  | Temporary password; unset means no seeding, and there is no default      |
-| `PORT`                                 | Port the container listens on (`8080`)                                   |
+| `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                       |
+| `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                                     |
+| `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                              |
+| `OpenAI__ApiKey`                       | Chat completions and embeddings                                                |
+| `Agents__BaseUrl`                      | Private-network address of the Python agents service                           |
+| `InternalApiKey`                       | Shared secret the agents service sends as `X-Internal-Key`                     |
+| `Resend__ApiKey`                       | Enables contact, verification, and password reset email                        |
+| `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)                  |
+| `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`)       |
+| `Seed__AdminUsername`                  | One-time admin bootstrap; the seeder no-ops once the user exists               |
+| `Seed__AdminEmail`                     | Email for the seeded admin account                                             |
+| `Seed__AdminPassword`                  | Temporary password; unset means no seeding, and there is no default            |
+| `PORT`                                 | Port the container listens on (`8080`)                                         |
 
 ---
 

@@ -22,14 +22,14 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 
 ## Third-Party Services
 
-| Service                        | Responsibility                                                                                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Render                         | Hosts everything: the ASP.NET Core API as a public web service at `api.jeemzu.me`, the Python agents as a private service with no public hostname, and managed PostgreSQL. Defined in `render.yaml`. |
-| Render PostgreSQL              | Production database for users, scores, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                              |
-| OpenAI                         | Supplies chat completions and text embeddings to the .NET RAG API and the Python agents. API keys are provided through deployment configuration.                                              |
-| Tavily                         | Optional web-search provider used by the chatbot agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                                       |
-| Resend                         | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                             |
-| GitHub Actions                 | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                       |
+| Service           | Responsibility                                                                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Render            | Hosts everything: the ASP.NET Core API as a public web service at `api.jeemzu.me`, the Python agents as a private service with no public hostname, and managed PostgreSQL. Defined in `render.yaml`. |
+| Render PostgreSQL | Production database for users, scores, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
+| OpenAI            | Supplies chat completions and text embeddings to the .NET RAG API and the Python agents. API keys are provided through deployment configuration.                                                     |
+| Tavily            | Optional web-search provider used by the chatbot agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                                              |
+| Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
+| GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
 
 The agents service is reachable only over Render's private network; the browser never calls it directly.
 
