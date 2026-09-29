@@ -110,6 +110,38 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Budgetize asks the assistant couldn't fulfil, grouped by feature so the most
+    /// requested gaps rise to the top.
+    /// </summary>
+    [HttpGet("budget/gaps")]
+    public async Task<ActionResult<List<BudgetGapSummaryResponse>>> BudgetGaps(CancellationToken ct)
+    {
+        var groups = await _db.BudgetCapabilityGaps
+            .AsNoTracking()
+            .GroupBy(g => g.SuggestedFeature)
+            .Select(g => new
+            {
+                SuggestedFeature = g.Key,
+                RequestCount = g.Count(),
+                UserCount = g.Select(x => x.UserId).Distinct().Count(),
+                LastRequestedAt = g.Max(x => x.CreatedAt),
+                Examples = g.OrderByDescending(x => x.CreatedAt).Take(3).Select(x => x.RequestText).ToList(),
+            })
+            .OrderByDescending(g => g.RequestCount)
+            .ThenByDescending(g => g.LastRequestedAt)
+            .ToListAsync(ct);
+
+        return Ok(groups.Select(g => new BudgetGapSummaryResponse
+        {
+            SuggestedFeature = g.SuggestedFeature,
+            RequestCount = g.RequestCount,
+            UserCount = g.UserCount,
+            LastRequestedAt = g.LastRequestedAt,
+            Examples = g.Examples,
+        }).ToList());
+    }
+
     /// <summary>Check health of external services (agent, database).</summary>
     [HttpGet("health")]
     public async Task<ActionResult<List<ServiceHealthStatus>>> HealthCheck(CancellationToken ct)

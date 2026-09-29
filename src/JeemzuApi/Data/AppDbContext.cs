@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<PartyMember> PartyMembers => Set<PartyMember>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
+    public DbSet<BudgetCapabilityGap> BudgetCapabilityGaps => Set<BudgetCapabilityGap>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -164,6 +165,22 @@ public class AppDbContext : DbContext
             entity.HasOne(b => b.User)
                   .WithMany()
                   .HasForeignKey(b => b.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // BudgetCapabilityGap — assistant requests Budgetize can't model yet
+        modelBuilder.Entity<BudgetCapabilityGap>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.RequestText).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.Reason).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.SuggestedFeature).IsRequired().HasMaxLength(120);
+            // Admin view ranks by how often the same feature is asked for
+            entity.HasIndex(g => g.SuggestedFeature);
+            entity.HasIndex(g => g.UserId);
+            entity.HasOne(g => g.User)
+                  .WithMany()
+                  .HasForeignKey(g => g.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

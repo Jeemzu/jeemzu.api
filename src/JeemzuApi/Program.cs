@@ -111,6 +111,15 @@ builder.Services.AddHttpClient<IRpgProxyService, RpgProxyService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// Budgetize assistant — a separate LangGraph service. The planner node can take a
+// while on a large budget, so this gets a longer timeout than the RPG proxy.
+var budgetAgentUrl = builder.Configuration["Budget:AgentUrl"] ?? "http://localhost:8003";
+builder.Services.AddHttpClient<IBudgetAgentProxyService, BudgetAgentProxyService>(client =>
+{
+    client.BaseAddress = new Uri(budgetAgentUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
 // ── Semantic Kernel + OpenAI ─────────────────────────────────────────────────
 // The Kernel and the LLM/embedding service instances are singletons: they hold
 // no per-request state and the underlying HTTP clients are designed to be reused.
