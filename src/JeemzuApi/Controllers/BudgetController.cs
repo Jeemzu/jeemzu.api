@@ -119,6 +119,20 @@ public class BudgetController : ControllerBase
         });
     }
 
+    /// <summary>Permanently deletes the saved budget. Idempotent: 204 even when none exists.</summary>
+    [HttpDelete]
+    public async Task<IActionResult> DeleteBudget(CancellationToken ct)
+    {
+        var userId = await ResolveUserIdAsync(ct);
+        if (userId is null) return Unauthorized();
+
+        await _db.BudgetSnapshots
+            .Where(b => b.UserId == userId.Value)
+            .ExecuteDeleteAsync(ct);
+
+        return NoContent();
+    }
+
     /// <summary>
     /// Asks the assistant about the budget. The budget travels in the request rather
     /// than being read from the database, so unsaved edits are visible; the assistant
