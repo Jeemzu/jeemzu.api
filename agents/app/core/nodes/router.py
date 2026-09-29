@@ -2,8 +2,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from state import AgentState
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.core.state import AgentState
 
 
 class RouterDecision(BaseModel):

@@ -2,8 +2,7 @@
 
 ASP.NET Core 8 REST API backing [jeemzu.me](https://jeemzu.me). Handles user accounts, authentication, game score submission, and leaderboards for the Jeemzu portfolio site.
 
-- **Production base URL:** `https://jeemzu-dpafd8b9dbezf6gx.canadaeast-01.azurewebsites.net`
-- **Dev base URL:** `https://<jeemzu-dev>.westus3-01.azurewebsites.net`
+- **Production base URL:** `https://api.jeemzu.me`
 - **Swagger UI:** `{baseUrl}/swagger`
 - **Health check:** `GET {baseUrl}/health`
 - **Source:** [github.com/Jeemzu/jeemzu.api](https://github.com/Jeemzu/jeemzu.api)
@@ -175,7 +174,7 @@ Same semantics as `POST /api/users`, but returns the full `ProfileResponse`.
 
 #### `POST /api/users/me/username`
 
-Renames the account. Existing scores and RPG party rows are renamed in the same transaction, all refresh tokens are revoked, and a fresh token pair is issued.
+Renames the account. Existing scores are renamed in the same transaction, all refresh tokens are revoked, and a fresh token pair is issued.
 
 **Auth required:** Yes
 
@@ -471,18 +470,24 @@ Returned by the summary endpoint.
 
 ---
 
-## Environment variables (Azure App Service)
+## Environment variables (Render)
 
 | Variable                               | Purpose                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------ |
-| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string                                             |
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string, in Npgsql keyword form (not a `postgres://` URI) |
 | `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                 |
 | `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                               |
 | `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                        |
+| `OpenAI__ApiKey`                       | Chat completions and embeddings                                          |
+| `Agents__BaseUrl`                      | Private-network address of the Python agents service                     |
+| `InternalApiKey`                       | Shared secret the agents service sends as `X-Internal-Key`               |
 | `Resend__ApiKey`                       | Enables contact, verification, and password reset email                  |
 | `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)            |
 | `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`) |
-| `WEBSITES_PORT`                        | Must be `8080` to match the container's listening port                   |
+| `Seed__AdminUsername`                  | One-time admin bootstrap; the seeder no-ops once the user exists         |
+| `Seed__AdminEmail`                     | Email for the seeded admin account                                       |
+| `Seed__AdminPassword`                  | Temporary password; unset means no seeding, and there is no default      |
+| `PORT`                                 | Port the container listens on (`8080`)                                   |
 
 ---
 
@@ -494,4 +499,5 @@ Allowed origins:
 - `https://www.jeemzu.me`
 - `http://localhost:5173` (Vite dev server)
 
-`AllowCredentials()` is enabled — required for the httpOnly refresh token cookie to be sent cross-origin.
+`AllowCredentials()` is enabled — required for the httpOnly refresh token cookie. The API is served
+from `api.jeemzu.me`, which is same-site with the frontend, so the cookie uses `SameSite=Lax`.

@@ -1,9 +1,9 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from state import AgentState
-from tools.knowledge_tool import search_knowledge
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.core.state import AgentState
+from app.core.tools.knowledge_tool import search_knowledge
 
 
 KNOWLEDGE_SYSTEM_PROMPT = """You are JeemzuAI, a friendly and knowledgeable assistant on James's portfolio site. You answer questions about James using the provided context from his knowledge base.

@@ -1,11 +1,11 @@
 from langgraph.graph import StateGraph, END
 
-from state import AgentState
-from nodes.router import router_node
-from nodes.knowledge import knowledge_node
-from nodes.game_stats import game_stats_node
-from nodes.web_search import web_search_node
-from nodes.synthesizer import synthesizer_node
+from app.core.state import AgentState
+from app.core.nodes.router import router_node
+from app.core.nodes.knowledge import knowledge_node
+from app.core.nodes.game_stats import game_stats_node
+from app.core.nodes.web_search import web_search_node
+from app.core.nodes.synthesizer import synthesizer_node
 
 
 def route_to_agents(state: AgentState) -> list[str]:
@@ -32,7 +32,7 @@ def chitchat_passthrough(state: AgentState) -> dict:
     from langchain_openai import ChatOpenAI
     from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 
-    from config import OPENAI_API_KEY, OPENAI_MODEL
+    from app.config import OPENAI_API_KEY, OPENAI_MODEL
 
     llm = ChatOpenAI(model=OPENAI_MODEL, api_key=OPENAI_API_KEY, temperature=0.7)
 
@@ -66,7 +66,7 @@ async def async_chitchat_passthrough(state: AgentState) -> dict:
     from langchain_openai import ChatOpenAI
     from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 
-    from config import OPENAI_API_KEY, OPENAI_MODEL
+    from app.config import OPENAI_API_KEY, OPENAI_MODEL
 
     llm = ChatOpenAI(model=OPENAI_MODEL, api_key=OPENAI_API_KEY, temperature=0.7)
 

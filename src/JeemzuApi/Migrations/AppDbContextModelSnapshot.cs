@@ -83,54 +83,6 @@ namespace JeemzuApi.Migrations
                     b.ToTable("BudgetSnapshots");
                 });
 
-            modelBuilder.Entity("JeemzuApi.Models.Campaign", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CharacterSummaryJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CurrentLocation")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("GameStateJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("HostUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("LastPlayedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HostUserId");
-
-                    b.ToTable("Campaigns");
-                });
-
             modelBuilder.Entity("JeemzuApi.Models.KnowledgeChunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -169,110 +121,6 @@ namespace JeemzuApi.Migrations
                         .IsUnique();
 
                     b.ToTable("KnowledgeChunks");
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.Party", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CampaignId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CurrentGamePhase")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("CurrentTurnUsername")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("HostUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("MaxPlayers")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RpgSessionId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CampaignId");
-
-                    b.HasIndex("Code");
-
-                    b.ToTable("Parties");
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.PartyMember", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CharacterClass")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("CharacterName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ConnectionId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ControlledByUsername")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsHost")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset>("JoinedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PartyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("TurnOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConnectionId");
-
-                    b.HasIndex("PartyId");
-
-                    b.ToTable("PartyMembers");
                 });
 
             modelBuilder.Entity("JeemzuApi.Models.RefreshToken", b =>
@@ -457,36 +305,6 @@ namespace JeemzuApi.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("JeemzuApi.Models.Campaign", b =>
-                {
-                    b.HasOne("JeemzuApi.Models.User", "HostUser")
-                        .WithMany()
-                        .HasForeignKey("HostUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("HostUser");
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.Party", b =>
-                {
-                    b.HasOne("JeemzuApi.Models.Campaign", null)
-                        .WithMany()
-                        .HasForeignKey("CampaignId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.PartyMember", b =>
-                {
-                    b.HasOne("JeemzuApi.Models.Party", "Party")
-                        .WithMany("Members")
-                        .HasForeignKey("PartyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Party");
-                });
-
             modelBuilder.Entity("JeemzuApi.Models.Score", b =>
                 {
                     b.HasOne("JeemzuApi.Models.User", "User")
@@ -506,11 +324,6 @@ namespace JeemzuApi.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.Party", b =>
-                {
-                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }

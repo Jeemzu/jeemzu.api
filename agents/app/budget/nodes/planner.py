@@ -3,11 +3,11 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from config import OPENAI_API_KEY, OPENAI_MODEL_PLANNER
-from models import BudgetProposal
-from state import BudgetAgentState
-from tools.capabilities import capability_brief
-from tools.context import describe_budget, describe_history, describe_projection
+from app.config import OPENAI_API_KEY, OPENAI_MODEL_PLANNER
+from app.budget.models import BudgetProposal
+from app.budget.state import BudgetAgentState
+from app.budget.tools.capabilities import capability_brief
+from app.budget.tools.context import describe_budget, describe_history, describe_projection
 
 SYSTEM_PROMPT = """You plan changes to one person's Budgetize budget.
 

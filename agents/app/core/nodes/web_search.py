@@ -1,9 +1,9 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from state import AgentState
-from tools.web_search_tool import web_search
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.core.state import AgentState
+from app.core.tools.web_search_tool import web_search
 
 
 WEB_SEARCH_SYSTEM_PROMPT = """You are JeemzuAI, a friendly assistant on James's portfolio site. You're answering a question using web search results.

@@ -2,12 +2,12 @@
 
 from langgraph.graph import END, StateGraph
 
-from nodes.analyst import analyst_node
-from nodes.composer import composer_node
-from nodes.gap_reporter import gap_reporter_node
-from nodes.planner import planner_node
-from nodes.router import router_node
-from state import BudgetAgentState
+from app.budget.nodes.analyst import analyst_node
+from app.budget.nodes.composer import composer_node
+from app.budget.nodes.gap_reporter import gap_reporter_node
+from app.budget.nodes.planner import planner_node
+from app.budget.nodes.router import router_node
+from app.budget.state import BudgetAgentState
 
 
 def route_after_router(state: BudgetAgentState) -> str:

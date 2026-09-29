@@ -1,34 +1,16 @@
-"""FastAPI application for the Budgetize assistant service."""
+"""HTTP surface for the Budgetize assistant."""
 
 import logging
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from graph import budget_graph
-from models import CamelModel
+from app.budget.graph import budget_graph
+from app.budget.models import CamelModel
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Jeemzu Budget Assistant",
-    description="Answers budget questions and proposes reviewable schedule changes",
-    version="0.1.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5050",
-        "https://jeemzu.me",
-        "https://www.jeemzu.me",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter(prefix="/budget", tags=["budget"])
 
 
 class ConversationMessage(BaseModel):
@@ -54,7 +36,7 @@ class BudgetChatResponse(CamelModel):
     capability_gap: dict | None = None
 
 
-@app.post("/budget/chat", response_model=BudgetChatResponse, response_model_by_alias=True)
+@router.post("/chat", response_model=BudgetChatResponse, response_model_by_alias=True)
 async def budget_chat(request: BudgetChatRequest) -> BudgetChatResponse:
     try:
         result = await budget_graph.ainvoke(
@@ -81,9 +63,3 @@ async def budget_chat(request: BudgetChatRequest) -> BudgetChatResponse:
         proposal=result.get("proposal"),
         capability_gap=result.get("capability_gap"),
     )
-
-
-@app.get("/health")
-@app.head("/health")
-async def health() -> dict:
-    return {"status": "ok"}

@@ -3,11 +3,11 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from config import OPENAI_API_KEY, OPENAI_MODEL_FAST
-from models import CapabilityGap
-from state import BudgetAgentState
-from tools.capabilities import capability_brief
-from tools.context import describe_history
+from app.config import OPENAI_API_KEY, OPENAI_MODEL_FAST
+from app.budget.models import CapabilityGap
+from app.budget.state import BudgetAgentState
+from app.budget.tools.capabilities import capability_brief
+from app.budget.tools.context import describe_history
 
 SYSTEM_PROMPT = """The user has asked Budgetize for something it cannot do yet.
 

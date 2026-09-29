@@ -1,7 +1,7 @@
 """Offline checks for graph wiring and the composer's op validation — no API key needed."""
 
-from graph import budget_graph
-from nodes.composer import composer_node
+from app.budget.graph import budget_graph
+from app.budget.nodes.composer import composer_node
 
 BUDGET = {
     "people": [{"id": "p1", "name": "James"}],

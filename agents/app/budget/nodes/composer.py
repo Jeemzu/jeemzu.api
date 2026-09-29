@@ -6,7 +6,7 @@ apply to the wrong item, so every op is checked against the data the request car
 before the user is ever shown it.
 """
 
-from state import BudgetAgentState
+from app.budget.state import BudgetAgentState
 
 # Ops that act on an existing item, and which collection that id must live in.
 _TARGET_COLLECTION = {

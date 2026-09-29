@@ -1,8 +1,8 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from state import AgentState
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.core.state import AgentState
 
 
 SYNTHESIZER_SYSTEM_PROMPT = """You are JeemzuAI, a friendly assistant on James's portfolio site. Your job is to combine information from multiple sources into a single coherent response.

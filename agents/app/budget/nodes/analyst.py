@@ -3,9 +3,9 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from config import OPENAI_API_KEY, OPENAI_MODEL_FAST
-from state import BudgetAgentState
-from tools.context import describe_budget, describe_history, describe_projection
+from app.config import OPENAI_API_KEY, OPENAI_MODEL_FAST
+from app.budget.state import BudgetAgentState
+from app.budget.tools.context import describe_budget, describe_history, describe_projection
 
 SYSTEM_PROMPT = """You are the Budgetize assistant, helping one person understand their own budget.
 

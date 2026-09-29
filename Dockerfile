@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "JeemzuApi.dll"]
+# Render injects PORT; the default keeps docker compose and plain docker run working.
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet JeemzuApi.dll"]

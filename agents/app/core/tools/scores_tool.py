@@ -1,7 +1,7 @@
 import httpx
 from langchain_core.tools import tool
 
-from config import DOTNET_API_URL, INTERNAL_API_KEY
+from app.config import DOTNET_API_URL, INTERNAL_API_KEY
 
 
 @tool

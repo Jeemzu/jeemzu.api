@@ -1,0 +1,109 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Every secret is `sync: false`: Render prompts for the value once and stores it in the
+# dashboard, so nothing sensitive is ever committed. Both repos are public.
+#
+# All three resources must share one region or the private network will not resolve.
+
+databases:
+  - name: jeemzu-db-instance
+    databaseName: jeemzudb
+    user: jeemzu
+    region: virginia
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+    # Empty list = reachable only from inside Render's private network.
+    ipAllowList: []
+
+services:
+  # ── Public API ──────────────────────────────────────────────────────────────
+  - type: web
+    name: jeemzu-api
+    runtime: docker
+    region: virginia
+    plan: starter
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Pinned so the private-network address below stays deterministic.
+      - key: PORT
+        value: "8080"
+
+      # Npgsql cannot parse Render's postgres:// URI, so this must be entered by hand in
+      # keyword form, using the database's INTERNAL host:
+      #   Host=<internal-host>;Port=5432;Database=jeemzudb;Username=jeemzu;Password=<pw>;SSL Mode=Require;Trust Server Certificate=true
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+
+      # Private-network address of the agents service. Confirm against the Render dashboard.
+      - key: Agents__BaseUrl
+        value: http://jeemzu-agents:8000
+
+      - key: Frontend__BaseUrl
+        value: https://jeemzu.me
+      - key: Jwt__Issuer
+        value: jeemzu-api
+      - key: Jwt__Audience
+        value: jeemzu-frontend
+      - key: Rag__TopK
+        value: "5"
+      - key: OpenAI__ChatModel
+        value: gpt-4o-mini
+      - key: OpenAI__EmbeddingModel
+        value: text-embedding-3-small
+
+      - key: Jwt__Secret
+        sync: false
+      - key: OpenAI__ApiKey
+        sync: false
+      - key: InternalApiKey
+        sync: false
+      - key: Resend__ApiKey
+        sync: false
+      - key: Resend__From
+        sync: false
+      - key: Resend__AccountFrom
+        sync: false
+
+      # One-time bootstrap of the owner's admin account. The seeder no-ops once the user
+      # exists, so these can be cleared after the temporary password has been rotated.
+      - key: Seed__AdminUsername
+        sync: false
+      - key: Seed__AdminEmail
+        sync: false
+      - key: Seed__AdminPassword
+        sync: false
+
+  # ── Private agents service (no public hostname) ─────────────────────────────
+  - type: pserv
+    name: jeemzu-agents
+    runtime: docker
+    region: virginia
+    plan: starter
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./agents/Dockerfile
+    dockerContext: ./agents
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: DOTNET_API_URL
+        value: http://jeemzu-api:8080/api
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_MODEL_PLANNER
+        value: gpt-4.1
+      - key: OPENAI_MODEL_FAST
+        value: gpt-4.1-mini
+
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false

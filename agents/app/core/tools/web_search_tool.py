@@ -1,7 +1,7 @@
 from langchain_tavily import TavilySearch
 from langchain_core.tools import tool
 
-from config import TAVILY_API_KEY
+from app.config import TAVILY_API_KEY
 
 
 @tool

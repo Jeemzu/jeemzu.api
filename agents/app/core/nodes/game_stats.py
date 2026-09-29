@@ -1,10 +1,10 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from state import AgentState
-from tools.scores_tool import get_leaderboard, get_game_summary
-from tools.users_tool import get_user_profile
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.core.state import AgentState
+from app.core.tools.scores_tool import get_leaderboard, get_game_summary
+from app.core.tools.users_tool import get_user_profile
 
 
 GAME_STATS_SYSTEM_PROMPT = """You are JeemzuAI, a friendly assistant on James's portfolio site. You answer questions about game scores, leaderboards, and player stats.
