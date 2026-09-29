@@ -19,7 +19,12 @@ public class UserService : IUserService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username)
             ?? throw new InvalidOperationException($"User '{username}' not found.");
 
-        user.OptedIn = request.OptedIn;
+        if (request.OptedIn is bool optedIn)
+            user.OptedIn = optedIn;
+
+        if (request.EmailListSubscribed is bool subscribed)
+            user.EmailListSubscribed = subscribed;
+
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 

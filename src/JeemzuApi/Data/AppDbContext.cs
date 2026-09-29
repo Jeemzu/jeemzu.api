@@ -10,12 +10,14 @@ public class AppDbContext : DbContext
 
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
     public DbSet<Party> Parties => Set<Party>();
     public DbSet<PartyMember> PartyMembers => Set<PartyMember>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
+    public DbSet<BudgetCapabilityGap> BudgetCapabilityGaps => Set<BudgetCapabilityGap>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +76,25 @@ public class AppDbContext : DbContext
             entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
             // Unique index so no two players can share a username
             entity.HasIndex(u => u.Username).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(256);
+            // Only verified addresses are reserved — an unverified signup can't squat someone else's email
+            entity.HasIndex(u => u.Email)
+                  .IsUnique()
+                  .HasFilter("\"Email\" IS NOT NULL AND \"EmailVerifiedAt\" IS NOT NULL");
+        });
+
+        // UserToken configuration — email verification and password reset
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(t => t.Purpose).IsRequired().HasMaxLength(30);
+            entity.HasIndex(t => new { t.TokenHash, t.Purpose });
+            entity.HasIndex(t => t.UserId);
+            entity.HasOne(t => t.User)
+                  .WithMany()
+                  .HasForeignKey(t => t.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // RefreshToken configuration
@@ -144,6 +165,22 @@ public class AppDbContext : DbContext
             entity.HasOne(b => b.User)
                   .WithMany()
                   .HasForeignKey(b => b.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // BudgetCapabilityGap — assistant requests Budgetize can't model yet
+        modelBuilder.Entity<BudgetCapabilityGap>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.RequestText).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.Reason).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.SuggestedFeature).IsRequired().HasMaxLength(120);
+            // Admin view ranks by how often the same feature is asked for
+            entity.HasIndex(g => g.SuggestedFeature);
+            entity.HasIndex(g => g.UserId);
+            entity.HasOne(g => g.User)
+                  .WithMany()
+                  .HasForeignKey(g => g.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

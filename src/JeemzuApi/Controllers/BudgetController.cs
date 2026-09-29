@@ -3,6 +3,7 @@ using System.Text.Json;
 using JeemzuApi.Data;
 using JeemzuApi.DTOs;
 using JeemzuApi.Models;
+using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,10 +22,17 @@ public class BudgetController : ControllerBase
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly AppDbContext _db;
+    private readonly IBudgetAgentProxyService _assistant;
+    private readonly ILogger<BudgetController> _logger;
 
-    public BudgetController(AppDbContext db)
+    public BudgetController(
+        AppDbContext db,
+        IBudgetAgentProxyService assistant,
+        ILogger<BudgetController> logger)
     {
         _db = db;
+        _assistant = assistant;
+        _logger = logger;
     }
 
     /// <summary>Returns the saved budget, or 404 when the user has not saved one yet.</summary>
@@ -109,6 +117,64 @@ public class BudgetController : ControllerBase
             Revision = revision,
             UpdatedAt = now,
         });
+    }
+
+    /// <summary>
+    /// Asks the assistant about the budget. The budget travels in the request rather
+    /// than being read from the database, so unsaved edits are visible; the assistant
+    /// only ever proposes changes, it never writes anything here.
+    /// </summary>
+    [HttpPost("chat")]
+    [RequestSizeLimit(2_000_000)]
+    public async Task<ActionResult<BudgetChatResult>> Chat(
+        [FromBody] BudgetChatRequest request,
+        CancellationToken ct)
+    {
+        var userId = await ResolveUserIdAsync(ct);
+        if (userId is null) return Unauthorized();
+
+        try
+        {
+            var result = await _assistant.ChatAsync(new BudgetChatPayload
+            {
+                Question = request.Question,
+                History = request.History,
+                Budget = request.Budget,
+                Projection = request.Projection,
+                Today = request.Today,
+                Strategy = request.Strategy,
+            }, ct);
+
+            return Ok(result);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Budget assistant call failed");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { message = "The budget assistant is unavailable right now." });
+        }
+    }
+
+    /// <summary>
+    /// Records something the assistant could not do, so unmet demand becomes a
+    /// backlog instead of vanishing into a chat transcript.
+    /// </summary>
+    [HttpPost("gaps")]
+    public async Task<IActionResult> LogGap([FromBody] LogBudgetGapRequest request, CancellationToken ct)
+    {
+        var userId = await ResolveUserIdAsync(ct);
+        if (userId is null) return Unauthorized();
+
+        _db.BudgetCapabilityGaps.Add(new BudgetCapabilityGap
+        {
+            UserId = userId.Value,
+            RequestText = request.Request,
+            Reason = request.Reason,
+            SuggestedFeature = request.SuggestedFeature.Trim().ToLowerInvariant(),
+        });
+        await _db.SaveChangesAsync(ct);
+
+        return NoContent();
     }
 
     private async Task<Guid?> ResolveUserIdAsync(CancellationToken ct)

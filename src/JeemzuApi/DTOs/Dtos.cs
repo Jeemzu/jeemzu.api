@@ -50,12 +50,15 @@ public class GameSummaryResponse
 // ── Users ────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Request body for POST /api/users.
-/// Username is taken from the JWT claim — only OptedIn is accepted from the client.
+/// Request body for POST /api/users and POST /api/users/me/preferences.
+/// Username is taken from the JWT claim. Omitted fields are left unchanged.
 /// </summary>
 public class UpdateUserRequest
 {
-    public bool OptedIn { get; set; }
+    public bool? OptedIn { get; set; }
+
+    /// <summary>Opt in/out of the notification mailing list.</summary>
+    public bool? EmailListSubscribed { get; set; }
 }
 
 /// <summary>Request body for POST /api/users/register.</summary>
@@ -65,12 +68,83 @@ public class RegisterRequest
     [MaxLength(50)]
     public string Username { get; set; } = string.Empty;
 
+    /// <summary>Recovery address. Must be verified before it can reset the password.</summary>
+    [Required]
+    [EmailAddress]
+    [MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+
     [Required]
     [MinLength(8)]
     [MaxLength(100)]
     public string Password { get; set; } = string.Empty;
 
     public bool OptedIn { get; set; }
+
+    public bool EmailListSubscribed { get; set; }
+}
+
+/// <summary>Request body for POST /api/users/me/username.</summary>
+public class ChangeUsernameRequest
+{
+    [Required]
+    [MaxLength(50)]
+    public string Username { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/me/password.</summary>
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(100)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/forgot-password.</summary>
+public class ForgotPasswordRequest
+{
+    [Required]
+    [EmailAddress]
+    [MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/reset-password.</summary>
+public class ResetPasswordRequest
+{
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(100)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>Request body for POST /api/users/verify-email.</summary>
+public class VerifyEmailRequest
+{
+    [Required]
+    public string Token { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Returned from the authenticated /api/users/me endpoints. Unlike UserResponse
+/// this includes private account settings, so it is never served for another user.
+/// </summary>
+public class ProfileResponse
+{
+    public string Username { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public bool EmailVerified { get; set; }
+    public bool OptedIn { get; set; }
+    public bool EmailListSubscribed { get; set; }
+    public string Role { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>
@@ -308,6 +382,33 @@ public class SaveCampaignResponse
 public static class BudgetAccountSource
 {
     public const string Pattern = "^(shared|autopay)$";
+
+    /// <summary>One-off entries may also land in a person's own checking account.</summary>
+    public const string OneOffPattern = "^(shared|autopay|personal)$";
+}
+
+/// <summary>How often a bill or debt repeats. Anything but "monthly" needs an anchor date.</summary>
+public static class BudgetRecurrence
+{
+    public const string FrequencyPattern = "^(monthly|weekly|biweekly|quarterly|annual)$";
+    public const string DatePattern = @"^\d{4}-\d{2}-\d{2}$";
+}
+
+/// <summary>One month of gross pay for one person. Months with no entry have no known income.</summary>
+public class BudgetMonthlyIncomeDto
+{
+    [Range(1900, 2999)]
+    public int Year { get; set; }
+
+    /// <summary>0-based month index.</summary>
+    [Range(0, 11)]
+    public int Month { get; set; }
+
+    [Range(1, 6)]
+    public int PaycheckCount { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int PerPaycheckCents { get; set; }
 }
 
 public class BudgetPersonDto
@@ -320,11 +421,9 @@ public class BudgetPersonDto
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    [Range(0, int.MaxValue)]
-    public int PersonalPerPaycheckCents { get; set; }
-
-    [Range(0, int.MaxValue)]
-    public int EssentialsPerPaycheckCents { get; set; }
+    /// <summary>Gross pay per month; months absent from this list are left blank in the projection.</summary>
+    [MaxLength(600)]
+    public List<BudgetMonthlyIncomeDto> Schedule { get; set; } = new();
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int PersonalBalanceCents { get; set; }
@@ -346,13 +445,24 @@ public class BudgetBillDto
     [Range(1, 31)]
     public int DueDay { get; set; }
 
-    /// <summary>Empty string means uncategorized.</summary>
-    [MaxLength(100)]
-    public string Category { get; set; } = string.Empty;
-
     [Required]
     [RegularExpression(BudgetAccountSource.Pattern)]
     public string PaidFrom { get; set; } = "shared";
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.FrequencyPattern)]
+    public string Frequency { get; set; } = "monthly";
+
+    /// <summary>First occurrence; required for every frequency except monthly.</summary>
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? AnchorISO { get; set; }
+
+    /// <summary>Inclusive bounds on when the bill is active at all; null means unbounded.</summary>
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? StartISO { get; set; }
+
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? EndISO { get; set; }
 }
 
 public class BudgetDebtDto
@@ -377,12 +487,109 @@ public class BudgetDebtDto
 
     public bool HasPromotion { get; set; }
 
+    /// <summary>Reference only — no interest math is done with these.</summary>
+    [Range(0, int.MaxValue)]
+    public int? InterestRateBps { get; set; }
+
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? PromoEndISO { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int? PostPromoRateBps { get; set; }
+
     [Range(1, 31)]
     public int DueDay { get; set; }
 
     [Required]
     [RegularExpression(BudgetAccountSource.Pattern)]
     public string PaidFrom { get; set; } = "autopay";
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.FrequencyPattern)]
+    public string Frequency { get; set; } = "monthly";
+
+    /// <summary>First occurrence; required for every frequency except monthly.</summary>
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? AnchorISO { get; set; }
+
+    /// <summary>Inclusive bounds on when the debt is active at all; null means unbounded.</summary>
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? StartISO { get; set; }
+
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? EndISO { get; set; }
+}
+
+/// <summary>
+/// A temporary change to one bill or debt over an inclusive date range, leaving
+/// the underlying item untouched so it resumes once the range ends.
+/// </summary>
+public class BudgetOverrideDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression("^(bill|debt)$")]
+    public string TargetKind { get; set; } = "bill";
+
+    [Required]
+    [MaxLength(64)]
+    public string TargetId { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string FromISO { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string ToISO { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression("^(skip|amount)$")]
+    public string Mode { get; set; } = "skip";
+
+    /// <summary>Replacement amount; null when the mode is "skip".</summary>
+    [Range(0, int.MaxValue)]
+    public int? AmountCents { get; set; }
+
+    [MaxLength(500)]
+    public string Note { get; set; } = string.Empty;
+}
+
+/// <summary>A single dated expense or deposit that does not repeat.</summary>
+public class BudgetOneOffDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression("^(expense|income)$")]
+    public string Kind { get; set; } = "expense";
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(0, int.MaxValue)]
+    public int AmountCents { get; set; }
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string DateISO { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression(BudgetAccountSource.OneOffPattern)]
+    public string Account { get; set; } = "shared";
+
+    /// <summary>Required when Account is "personal"; null otherwise.</summary>
+    [MaxLength(64)]
+    public string? PersonId { get; set; }
+
+    [MaxLength(500)]
+    public string Note { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -402,6 +609,14 @@ public class BudgetDataDto
     [Required]
     [MaxLength(1000)]
     public List<BudgetDebtDto> Debts { get; set; } = [];
+
+    [Required]
+    [MaxLength(2000)]
+    public List<BudgetOverrideDto> Overrides { get; set; } = [];
+
+    [Required]
+    [MaxLength(2000)]
+    public List<BudgetOneOffDto> OneOffs { get; set; } = [];
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int EssentialsBalanceCents { get; set; }
@@ -429,6 +644,88 @@ public class BudgetSnapshotResponse
     public BudgetDataDto Data { get; set; } = new();
     public Guid Revision { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+// ── Budget assistant ──────────────────────────────────────────────────────────
+
+/// <summary>Request body for POST /api/budget/chat.</summary>
+public class BudgetChatRequest
+{
+    [Required]
+    [MinLength(1)]
+    [MaxLength(2000)]
+    public string Question { get; set; } = string.Empty;
+
+    [MaxLength(40)]
+    public List<ConversationMessage> History { get; set; } = [];
+
+    /// <summary>
+    /// The budget as it currently sits in the browser, including unsaved edits,
+    /// alongside the projection the client already computed from it.
+    /// </summary>
+    [Required]
+    public BudgetDataDto Budget { get; set; } = new();
+
+    /// <summary>Opaque to this API — forwarded to the assistant as the client produced it.</summary>
+    [Required]
+    public JsonElement Projection { get; set; }
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string Today { get; set; } = string.Empty;
+
+    [RegularExpression("^(suggested|minimum)$")]
+    public string Strategy { get; set; } = "suggested";
+}
+
+/// <summary>Payload forwarded to the Python assistant service.</summary>
+public class BudgetChatPayload
+{
+    public string Question { get; set; } = string.Empty;
+    public List<ConversationMessage> History { get; set; } = [];
+    public BudgetDataDto Budget { get; set; } = new();
+    public JsonElement Projection { get; set; }
+    public string Today { get; set; } = string.Empty;
+    public string Strategy { get; set; } = "suggested";
+}
+
+/// <summary>
+/// The assistant's reply. Proposal and gap stay as raw JSON: the assistant already
+/// emits the client's own shapes, so re-modelling them here would only add drift.
+/// </summary>
+public class BudgetChatResult
+{
+    public string Answer { get; set; } = string.Empty;
+    public string Intent { get; set; } = string.Empty;
+    public JsonElement? Proposal { get; set; }
+    public JsonElement? CapabilityGap { get; set; }
+}
+
+/// <summary>Request body for POST /api/budget/gaps.</summary>
+public class LogBudgetGapRequest
+{
+    [Required]
+    [MaxLength(2000)]
+    public string Request { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(2000)]
+    public string Reason { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(120)]
+    public string SuggestedFeature { get; set; } = string.Empty;
+}
+
+/// <summary>One row of GET /api/admin/budget/gaps — requests grouped by feature.</summary>
+public class BudgetGapSummaryResponse
+{
+    public string SuggestedFeature { get; set; } = string.Empty;
+    public int RequestCount { get; set; }
+    public int UserCount { get; set; }
+    public DateTimeOffset LastRequestedAt { get; set; }
+    /// <summary>A few recent verbatim requests, for context.</summary>
+    public List<string> Examples { get; set; } = [];
 }
 
 // ── Contact ───────────────────────────────────────────────────────────────────

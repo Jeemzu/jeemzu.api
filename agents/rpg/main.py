@@ -24,7 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://localhost:5000",
+        "http://localhost:5050",
         "https://jeemzu.me",
         "https://www.jeemzu.me",
     ],

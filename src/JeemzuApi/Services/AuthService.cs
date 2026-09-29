@@ -43,7 +43,9 @@ public class AuthService : IAuthService
         var user = new JeemzuApi.Models.User
         {
             Username = request.Username,
+            Email = request.Email.Trim().ToLowerInvariant(),
             OptedIn = request.OptedIn,
+            EmailListSubscribed = request.EmailListSubscribed,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
         };
 
@@ -111,7 +113,14 @@ public class AuthService : IAuthService
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<TokenResponse> IssueTokensAsync(
+    public async Task RevokeAllRefreshTokensAsync(string username)
+    {
+        await _db.RefreshTokens
+            .Where(r => r.Username == username && !r.IsRevoked)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsRevoked, true));
+    }
+
+    public async Task<TokenResponse> IssueTokensAsync(
         string username, string role, HttpResponse response)
     {
         var accessToken = BuildAccessToken(username, role);
