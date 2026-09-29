@@ -16,6 +16,7 @@ _TARGET_COLLECTION = {
     "remove_bill": "bills",
     "update_debt": "debts",
     "update_person": "people",
+    "set_month_income": "people",
 }
 
 _REQUIRED_FIELDS = {
@@ -23,6 +24,7 @@ _REQUIRED_FIELDS = {
     "add_one_off": ("kind", "name", "amountCents", "dateISO", "account"),
     "add_bill": ("name", "amountCents", "dueDay", "paidFrom"),
     "set_balance": ("balanceTarget", "amountCents"),
+    "set_month_income": ("targetId", "year", "perPaycheckCents"),
 }
 
 
@@ -62,6 +64,23 @@ def _validate(op: dict, budget: dict) -> str | None:
     if name == "set_balance":
         if op.get("balanceTarget") == "personal" and op.get("targetId") not in _ids(budget, "people"):
             return "it names a person who does not exist"
+
+    if name == "set_month_income":
+        # month 0 is January, so check presence separately from the range.
+        month = op.get("month")
+        if month is None:
+            return "it is missing month"
+        if not isinstance(month, int) or not 0 <= month <= 11:
+            return "month must be 0-11, where 0 is January"
+        year = op.get("year")
+        if not isinstance(year, int) or not 1900 <= year <= 2999:
+            return "year must be a four-digit calendar year"
+        count = op.get("paycheckCount")
+        if count is not None and (not isinstance(count, int) or not 1 <= count <= 6):
+            return "paycheckCount must be between 1 and 6"
+        cents = op.get("perPaycheckCents")
+        if not isinstance(cents, int) or cents < 0:
+            return "perPaycheckCents must be a whole number of cents"
 
     collection = _TARGET_COLLECTION.get(name)
     if collection and op.get("targetId") not in _ids(budget, collection):

@@ -30,6 +30,7 @@ OpName = Literal[
     "remove_bill",
     "update_debt",
     "update_person",
+    "set_month_income",
     "set_balance",
 ]
 
@@ -63,7 +64,6 @@ class BudgetOp(CamelModel):
     name: str | None = None
     amount_cents: int | None = Field(default=None, description="Money is always whole cents.")
     due_day: int | None = Field(default=None, description="Calendar day 1-31.")
-    category: str | None = None
     paid_from: Literal["shared", "autopay"] | None = None
     frequency: Literal["monthly", "weekly", "biweekly", "quarterly", "annual"] | None = None
     anchor_iso: str | None = Field(default=None, description="First occurrence; required unless monthly.")
@@ -74,10 +74,18 @@ class BudgetOp(CamelModel):
     person_id: str | None = None
     note: str = ""
 
-    # set_balance / update_person
+    # set_balance
     balance_target: Literal["essentials", "autopay", "personal"] | None = None
-    personal_per_paycheck_cents: int | None = None
-    essentials_per_paycheck_cents: int | None = None
+
+    # set_month_income
+    year: int | None = Field(default=None, description="Four-digit calendar year.")
+    month: int | None = Field(default=None, description="0-based month index, 0 = January.")
+    paycheck_count: int | None = Field(
+        default=None, description="Paydays in the month; omit to use the Wednesday calendar."
+    )
+    per_paycheck_cents: int | None = Field(
+        default=None, description="Gross pay landing on each payday that month, in whole cents."
+    )
 
 
 class BudgetProposal(CamelModel):

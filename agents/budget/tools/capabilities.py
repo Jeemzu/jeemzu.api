@@ -16,23 +16,29 @@ add_one_off     — a single dated expense or deposit that does not repeat.
                   ("shared", "autopay", or "personal"), and personId when account is "personal".
 remove_one_off  — drop a one-off. Needs: targetId.
 add_bill        — a new recurring bill. Needs: name, amountCents, dueDay, paidFrom, frequency,
-                  plus anchorISO when frequency is not "monthly". Optional: category, startISO, endISO.
+                  plus anchorISO when frequency is not "monthly". Optional: startISO, endISO.
 update_bill     — change an existing bill permanently. Needs: targetId plus the fields to change.
 remove_bill     — delete a bill outright. Needs: targetId.
 update_debt     — change an existing debt permanently. Needs: targetId plus fields
                   (amountCents maps to minPaymentCents, dueDay, paidFrom, frequency, startISO, endISO).
-update_person   — change someone's paycheck split. Needs: targetId plus
-                  personalPerPaycheckCents and/or essentialsPerPaycheckCents.
+update_person   — rename someone. Needs: targetId plus name.
+set_month_income — set one person's gross pay for one calendar month. Needs: targetId, year,
+                  month (0-based, 0 = January), perPaycheckCents. Optional: paycheckCount, which
+                  otherwise comes from the Wednesday calendar. One op per person per month.
 set_balance     — correct a current account balance. Needs: balanceTarget
                   ("essentials", "autopay", or "personal"), amountCents, and targetId when "personal".
 """
 
 DATA_MODEL = """\
 - Money is always whole cents (integers). $1,250.00 is 125000.
-- Paychecks land every Wednesday. Each person deposits a fixed amount into their own
-  personal account and a fixed amount into the shared essentials account.
-- A slice of everyone's essentials deposit is automatically carved out each payday to
-  fund the auto-pay account, sized from the bills and debts marked paidFrom "autopay".
+- Paychecks land every Wednesday. Each person has a per-month pay schedule: a gross
+  amount per paycheck and how many paychecks that month has (4 or 5). Months missing
+  from a person's schedule have NO known income and are left blank in the projection —
+  never assume a number for them, and say so when a question touches one.
+- Each paycheck is split automatically, not by the user: the month's auto-pay need and
+  shared essentials need are sized from the bills and debts themselves, divided between
+  people in proportion to their gross pay, and whatever is left over is personal money.
+  You cannot set the split directly; change the bills, the debts, or the gross pay.
 - Bills and debts draft from whichever account their paidFrom names.
 - Recurrence: monthly, weekly, biweekly, quarterly, or annual. Monthly/quarterly/annual
   charge on dueDay (days 29-31 clamp to the last day of shorter months); weekly and
@@ -41,13 +47,16 @@ DATA_MODEL = """\
   like a lease ending. Use an override for a temporary one, so the item resumes by itself.
 - Debts are paid at either their promo "suggested" payment or their minimum, depending on
   the strategy the user has selected. You cannot change the strategy.
+- A debt's interest rate, promotion end date, and post-promotion rate are stored for
+  reference only. Nothing is computed from them, and the promotion does not expire on its own.
 """
 
 NOT_SUPPORTED = """\
 - Interest accrual, amortization schedules, or payoff-date math on debts. Balances do
   not compound; a debt's balance is a number the user types in.
-- Variable or hourly income, bonuses tied to a formula, or any pay cadence other than the
-  fixed Wednesday paycheck. (A known one-time bonus IS supported — use add_one_off.)
+- Hourly income, pay tied to a formula, or any cadence other than the Wednesday paycheck.
+  Pay that changes month to month IS supported — use set_month_income. A known one-time
+  bonus IS supported — use add_one_off.
 - Savings goals, sinking funds, investment or retirement accounts, and net worth.
 - Taxes, withholding, or paycheck gross-to-net calculation.
 - Categories or budget caps with enforced spending limits, and actual-vs-budget tracking

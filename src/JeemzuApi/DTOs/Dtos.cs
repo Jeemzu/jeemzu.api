@@ -394,6 +394,23 @@ public static class BudgetRecurrence
     public const string DatePattern = @"^\d{4}-\d{2}-\d{2}$";
 }
 
+/// <summary>One month of gross pay for one person. Months with no entry have no known income.</summary>
+public class BudgetMonthlyIncomeDto
+{
+    [Range(1900, 2999)]
+    public int Year { get; set; }
+
+    /// <summary>0-based month index.</summary>
+    [Range(0, 11)]
+    public int Month { get; set; }
+
+    [Range(1, 6)]
+    public int PaycheckCount { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int PerPaycheckCents { get; set; }
+}
+
 public class BudgetPersonDto
 {
     [Required]
@@ -404,11 +421,9 @@ public class BudgetPersonDto
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    [Range(0, int.MaxValue)]
-    public int PersonalPerPaycheckCents { get; set; }
-
-    [Range(0, int.MaxValue)]
-    public int EssentialsPerPaycheckCents { get; set; }
+    /// <summary>Gross pay per month; months absent from this list are left blank in the projection.</summary>
+    [MaxLength(600)]
+    public List<BudgetMonthlyIncomeDto> Schedule { get; set; } = new();
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int PersonalBalanceCents { get; set; }
@@ -429,10 +444,6 @@ public class BudgetBillDto
 
     [Range(1, 31)]
     public int DueDay { get; set; }
-
-    /// <summary>Empty string means uncategorized.</summary>
-    [MaxLength(100)]
-    public string Category { get; set; } = string.Empty;
 
     [Required]
     [RegularExpression(BudgetAccountSource.Pattern)]
@@ -475,6 +486,16 @@ public class BudgetDebtDto
     public int? SuggestedPaymentCents { get; set; }
 
     public bool HasPromotion { get; set; }
+
+    /// <summary>Reference only — no interest math is done with these.</summary>
+    [Range(0, int.MaxValue)]
+    public int? InterestRateBps { get; set; }
+
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? PromoEndISO { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int? PostPromoRateBps { get; set; }
 
     [Range(1, 31)]
     public int DueDay { get; set; }

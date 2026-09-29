@@ -63,6 +63,21 @@ stray = {"op": "add_one_off", "rationale": "x", "kind": "expense", "name": "Tire
 out = composer_node(base(proposal={"summary": "s", "ops": [stray]}))
 check("one-off naming an unknown person is rejected", out["proposal"] is None)
 
+january = {"op": "set_month_income", "rationale": "Raise in January.", "targetId": "p1",
+           "year": 2027, "month": 0, "perPaycheckCents": 206396}
+out = composer_node(base(proposal={"summary": "s", "ops": [january]}))
+check("month 0 is accepted as January", len(out["proposal"]["ops"]) == 1)
+
+out = composer_node(base(proposal={"summary": "s", "ops": [{**january, "month": 12}]}))
+check("out-of-range month is rejected", out["proposal"] is None)
+
+out = composer_node(base(proposal={"summary": "s", "ops": [{**january, "targetId": "nobody"}]}))
+check("month income for an unknown person is rejected", out["proposal"] is None)
+
+no_month = {k: v for k, v in january.items() if k != "month"}
+out = composer_node(base(proposal={"summary": "s", "ops": [no_month]}))
+check("month income without a month is rejected", out["proposal"] is None)
+
 out = composer_node(base(capability_gap={"request": "r", "reason": "No interest model exists.",
                                          "suggestedFeature": "debt interest projection"}))
 check("capability gap becomes a user-facing answer", "logged" in out["answer"])

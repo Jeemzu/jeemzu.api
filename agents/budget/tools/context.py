@@ -23,17 +23,46 @@ def _recurrence(item: dict) -> str:
     return detail + (f", {', '.join(window)}" if window else "")
 
 
+_MONTHS = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _schedule(entries: list[dict]) -> list[str]:
+    lines = []
+    for e in sorted(entries, key=lambda x: (x.get("year", 0), x.get("month", 0))):
+        month = e.get("month")
+        label = _MONTHS[month] if isinstance(month, int) and 0 <= month <= 11 else "?"
+        count = e.get("paycheckCount", 0)
+        gross = (e.get("perPaycheckCents") or 0) * count
+        lines.append(
+            f'    {label} {e.get("year")}: {_money(e.get("perPaycheckCents"))} × {count} paychecks '
+            f"= {_money(gross)} gross"
+        )
+    return lines or ["    (no months on file — those months are blank in the projection)"]
+
+
 def describe_budget(budget: dict) -> str:
     """Every id is included verbatim — ops must target real ids, never invented ones."""
     lines: list[str] = []
 
-    lines.append("PEOPLE (income)")
+    lines.append("PEOPLE (gross pay per month)")
     for p in budget.get("people", []):
         lines.append(
-            f'  id={p["id"]} "{p["name"]}" — {_money(p.get("personalPerPaycheckCents"))}/paycheck personal, '
-            f'{_money(p.get("essentialsPerPaycheckCents"))}/paycheck essentials, '
-            f'personal balance {_money(p.get("personalBalanceCents"))}'
+            f'  id={p["id"]} "{p["name"]}" — personal balance {_money(p.get("personalBalanceCents"))}'
         )
+        lines.extend(_schedule(p.get("schedule") or []))
     if not budget.get("people"):
         lines.append("  (none)")
 
@@ -45,10 +74,9 @@ def describe_budget(budget: dict) -> str:
     lines.append("")
     lines.append("BILLS")
     for b in budget.get("bills", []):
-        category = f', category "{b["category"]}"' if b.get("category") else ""
         lines.append(
             f'  id={b["id"]} "{b["name"]}" — {_money(b.get("amountCents"))}, {_recurrence(b)}, '
-            f'paid from {b.get("paidFrom")}{category}'
+            f'paid from {b.get("paidFrom")}'
         )
     if not budget.get("bills"):
         lines.append("  (none)")
@@ -61,9 +89,13 @@ def describe_budget(budget: dict) -> str:
             if d.get("hasPromotion")
             else ""
         )
+        if d.get("promoEndISO"):
+            promo += f' until {d["promoEndISO"]}'
+        rate = d.get("interestRateBps")
+        rate_text = f", rate {rate / 100:.2f}% (reference only)" if rate is not None else ""
         lines.append(
             f'  id={d["id"]} "{d["name"]}" — balance {_money(d.get("balanceCents"))}, '
-            f'minimum {_money(d.get("minPaymentCents"))}{promo}, {_recurrence(d)}, '
+            f'minimum {_money(d.get("minPaymentCents"))}{promo}{rate_text}, {_recurrence(d)}, '
             f'paid from {d.get("paidFrom")}'
         )
     if not budget.get("debts"):
