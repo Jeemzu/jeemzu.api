@@ -546,6 +546,13 @@ public class BudgetDataDto
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int AutopayBalanceCents { get; set; }
+
+    /// <summary>yyyy-mm-dd the balances are as of; null means the client's today.</summary>
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? ProjectionStartISO { get; set; }
+
+    [RegularExpression("^(suggested|minimum)$")]
+    public string DebtStrategy { get; set; } = "suggested";
 }
 
 /// <summary>Request body for PUT /api/budget.</summary>
