@@ -14,7 +14,7 @@ namespace JeemzuApi.Services;
 public class AuthService : IAuthService
 {
     private const string RefreshTokenCookie = "refreshToken";
-    private const int AccessTokenMinutes = 60;
+    private const int AccessTokenMinutes = 24 * 60;
     private const int RefreshTokenDays = 30;
 
     private readonly AppDbContext _db;
