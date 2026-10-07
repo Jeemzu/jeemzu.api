@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace JeemzuApi.DTOs;
 
@@ -351,13 +352,41 @@ public class BudgetPersonDto
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int PersonalBalanceCents { get; set; }
 
-    /// <summary>Fixed monthly auto-pay contribution; null means proportional funding.</summary>
-    [Range(0, int.MaxValue)]
-    public int? AutopayLockedMonthlyCents { get; set; }
+    private int? _autopayLock;
+    private int? _essentialsLock;
+    private bool _autopayLockSpecified;
+    private bool _essentialsLockSpecified;
 
-    /// <summary>Fixed monthly essentials contribution; null means proportional funding.</summary>
+    /// <summary>Fixed auto-pay contribution every paycheck; null means proportional funding.</summary>
     [Range(0, int.MaxValue)]
-    public int? EssentialsLockedMonthlyCents { get; set; }
+    public int? AutopayLockedPerPaycheckCents
+    {
+        get => _autopayLock;
+        set { _autopayLock = value; _autopayLockSpecified = true; }
+    }
+
+    /// <summary>Fixed essentials contribution every paycheck; null means proportional funding.</summary>
+    [Range(0, int.MaxValue)]
+    public int? EssentialsLockedPerPaycheckCents
+    {
+        get => _essentialsLock;
+        set { _essentialsLock = value; _essentialsLockSpecified = true; }
+    }
+
+    // Read earlier snapshots without writing obsolete monthly field names back out.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? AutopayLockedMonthlyCents
+    {
+        get => null;
+        set { if (!_autopayLockSpecified) _autopayLock = value; }
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EssentialsLockedMonthlyCents
+    {
+        get => null;
+        set { if (!_essentialsLockSpecified) _essentialsLock = value; }
+    }
 }
 
 public class BudgetBillDto
