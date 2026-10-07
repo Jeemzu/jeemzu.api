@@ -44,6 +44,12 @@ Budgetize subscriptions are stored in the existing budget `bills` array. The opt
 omitted values default to `false`. Billing validation and storage are unchanged,
 and no database migration is required.
 
+Budget people also accept nullable `autopayLockedMonthlyCents` and
+`essentialsLockedMonthlyCents`: nonnegative integer cents fixed across pay months.
+Null/omitted means proportional funding; zero locks the contribution at $0.
+These fields round-trip in saved budget JSON without a database migration.
+Deploy this contract before the frontend contribution-lock controls.
+
 ### Auth — `/api/auth`
 
 | Method | Path                | Auth | Description                                                           |

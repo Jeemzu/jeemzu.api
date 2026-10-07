@@ -350,6 +350,14 @@ public class BudgetPersonDto
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int PersonalBalanceCents { get; set; }
+
+    /// <summary>Fixed monthly auto-pay contribution; null means proportional funding.</summary>
+    [Range(0, int.MaxValue)]
+    public int? AutopayLockedMonthlyCents { get; set; }
+
+    /// <summary>Fixed monthly essentials contribution; null means proportional funding.</summary>
+    [Range(0, int.MaxValue)]
+    public int? EssentialsLockedMonthlyCents { get; set; }
 }
 
 public class BudgetBillDto
