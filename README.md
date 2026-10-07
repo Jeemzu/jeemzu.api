@@ -39,6 +39,11 @@ Docker Compose starts PostgreSQL and the Python agents service for local develop
 
 ## API Endpoints
 
+Budgetize subscriptions are stored in the existing budget `bills` array. The optional
+`isSubscription` boolean on each bill preserves its frontend section assignment;
+omitted values default to `false`. Billing validation and storage are unchanged,
+and no database migration is required.
+
 ### Auth — `/api/auth`
 
 | Method | Path                | Auth | Description                                                           |

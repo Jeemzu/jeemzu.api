@@ -362,6 +362,9 @@ public class BudgetBillDto
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Frontend section assignment only; subscriptions are budgeted and stored as bills.</summary>
+    public bool IsSubscription { get; set; }
+
     [Range(0, int.MaxValue)]
     public int AmountCents { get; set; }
 
