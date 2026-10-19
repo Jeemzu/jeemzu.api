@@ -555,6 +555,35 @@ public class BudgetOneOffDto
     public string Note { get; set; } = string.Empty;
 }
 
+/// <summary>A dated personal expense; null PersonId splits it across personal accounts.</summary>
+public class BudgetPersonalExpenseDto
+{
+    [Required]
+    [MaxLength(64)]
+    public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(0, int.MaxValue)]
+    public int AmountCents { get; set; }
+
+    [Required]
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string DateISO { get; set; } = string.Empty;
+
+    [Required]
+    [RegularExpression("^(once|monthly|weekly|biweekly|quarterly|annual)$")]
+    public string Frequency { get; set; } = "once";
+
+    [RegularExpression(BudgetRecurrence.DatePattern)]
+    public string? EndISO { get; set; }
+
+    [MaxLength(64)]
+    public string? PersonId { get; set; }
+}
+
 /// <summary>
 /// Mirrors the client-side BudgetData type. Collection caps bound the payload so a
 /// single save cannot store an unbounded document.
@@ -580,6 +609,10 @@ public class BudgetDataDto
     [Required]
     [MaxLength(2000)]
     public List<BudgetOneOffDto> OneOffs { get; set; } = [];
+
+    [Required]
+    [MaxLength(2000)]
+    public List<BudgetPersonalExpenseDto> PersonalExpenses { get; set; } = [];
 
     /// <summary>Signed — a checking account can be overdrawn.</summary>
     public int EssentialsBalanceCents { get; set; }

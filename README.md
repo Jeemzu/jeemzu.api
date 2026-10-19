@@ -52,6 +52,15 @@ Earlier monthly-named fields are read as the same entered per-paycheck amounts;
 explicit new fields (including null) take precedence, and responses use only the new names.
 Deploy this contract before the frontend contribution-lock controls.
 
+Budget snapshots also accept `personalExpenses` (up to 2,000 items), each with
+`id`, `name`, `amountCents`, `dateISO`, `frequency`, nullable `endISO`, and nullable
+`personId`. Frequencies are `once`, `weekly`, `biweekly`, `monthly`, `quarterly`,
+and `annual`. A null person targets the combined personal spending plan;
+otherwise it targets that person's account. The frontend computes occurrence-month
+paycheck-remainder splits. Omitted collections default to empty for older snapshots.
+Deploy this DTO before the personal-planning frontend so saves preserve the plans.
+No database migration is needed.
+
 ### Auth — `/api/auth`
 
 | Method | Path                | Auth | Description                                                           |
