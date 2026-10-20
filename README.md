@@ -39,6 +39,27 @@ Docker Compose starts PostgreSQL and the Python agents service for local develop
 
 ## API Endpoints
 
+### GDD library - `/api/gdd-documents`
+
+- Authenticated users can store multiple named documents as a generated PDF plus an editable draft ZIP containing original images. Binary data stays in PostgreSQL; no new storage service is required.
+- The account quota is 100 MiB (104,857,600 bytes), counting PDF bytes plus compressed ZIP bytes. Uploads allow a 20 MiB PDF, 25 MiB ZIP, and 46 MiB multipart request. Saves reuse the `account-user` rate limit. Owner-scoped queries, per-account transactional locking, revision checks, and user-deletion cascade protect consistency.
+- Deploy this API before the GDD account-library frontend. Startup applies the `AddGddDocuments` migration; no production migration has been run as part of implementation. Database backups must now include the document binaries.
+- See [API.md](API.md#gdd-library---apigdd-documents) for routes and [gdd-documents.http](gdd-documents.http) for local requests.
+
+#### Focused GDD tests
+
+Use a disposable local PostgreSQL 16 database with pgvector; never use a production connection.
+
+```powershell
+docker run --rm -d --name jeemzu-gdd-tests -p 127.0.0.1:55439:5432 -e POSTGRES_DB=gdd_test -e POSTGRES_USER=gdd_test -e POSTGRES_PASSWORD=local-test-only pgvector/pgvector:pg16
+# Wait for: docker exec jeemzu-gdd-tests pg_isready -U gdd_test
+$env:GDD_TEST_CONNECTION = 'Host=127.0.0.1;Port=55439;Database=gdd_test;Username=gdd_test;Password=local-test-only'
+dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj --configuration Release --filter 'FullyQualifiedName~Gdd'
+docker stop jeemzu-gdd-tests
+```
+
+Tests apply real migrations and exercise multipart endpoints, stored bytes, ownership, revisions, concurrent quota enforcement, and cascade deletion. The test host uses a test-only identity handler; production continues to use JWT authentication.
+
 Budgetize subscriptions are stored in the existing budget `bills` array. The optional
 `isSubscription` boolean on each bill preserves its frontend section assignment;
 omitted values default to `false`. Billing validation and storage are unchanged,
@@ -259,6 +280,24 @@ dotnet user-secrets set "Resend:AccountFrom" "Jeemzu <no-reply@your-verified-dom
 Verification and reset links point at `Frontend:BaseUrl` (`http://localhost:5173` in Development,
 `https://jeemzu.me` otherwise). Without `Resend:ApiKey` registration still succeeds — the email is
 skipped and logged, so the address stays unverified and can't be used for password recovery.
+
+#### Reset a local admin password without email
+
+In an interactive PowerShell terminal, select the local Docker database and run:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = 'Host=::1;Port=5432;Database=jeemzu_db;Username=jeemzu;Password=jeemzu_dev_password'
+dotnet run --project C:\dev\jeemzu.api\src\JeemzuApi --configuration Debug --no-launch-profile -- --reset-local-admin-password jeemzu
+```
+
+The command prompts twice without echoing the new password. It only accepts a
+loopback connection to `jeemzu_db` and an existing Admin account. It uses the
+application's BCrypt work factor, verifies the persisted password, revokes refresh
+sessions and outstanding password-reset links, and exits without starting the API,
+running migrations, sending email, or seeding data. Existing access JWTs remain
+valid until expiry. The IPv6 host avoids the competing IPv4 PostgreSQL listener
+on this development machine. Debug output is separate from the running Release
+API; stop a running Debug API first if it locks the build output.
 
 ### 3. Run the API
 

@@ -33,6 +33,26 @@ Username and password remain the sign-in credentials. Registration also collects
 
 ## Endpoints
 
+### GDD library - `/api/gdd-documents`
+
+All routes require a JWT and resolve ownership from the authenticated username. Another user's document returns `404`. Responses use `Cache-Control: no-store`.
+
+| Method | Path | Result |
+| ------ | ---- | ------ |
+| `GET` | `/api/gdd-documents` | `200 { documents, usedBytes, limitBytes }` |
+| `GET` | `/api/gdd-documents/{id}` | `200` document metadata |
+| `POST` | `/api/gdd-documents` | Multipart create; `201` metadata and Location |
+| `PUT` | `/api/gdd-documents/{id}` | Multipart replace; `200` metadata with a new revision |
+| `GET` | `/api/gdd-documents/{id}/pdf?revision={revision}` | Download PDF |
+| `GET` | `/api/gdd-documents/{id}/draft?revision={revision}` | Download editable ZIP and original images |
+| `DELETE` | `/api/gdd-documents/{id}?revision={revision}` | `204`, releasing storage |
+
+- Metadata: `id` and `revision` UUIDs, `title`, `pdfBytes`, `draftBytes`, `createdAt`, and `updatedAt` (UTC timestamps). Listing does not load binaries.
+- Save fields: `title` (1-100 characters, single line), `pdf` (file), `draft` (file), and `revision` (required on update, omitted on create). The ZIP must contain version-1 `jeemzu-gdd-editor` metadata whose game title matches `title`. Download both files using the same revision to restore a consistent editable document.
+- Storage: 100 MiB per account, including PDFs and compressed draft ZIPs. PDF maximum: 20 MiB; ZIP: 25 MiB; complete multipart request: 46 MiB. Updates subtract the replaced version before charging the new bytes. ZIP validation also bounds paths, types, entries, and expanded sizes.
+- Errors: `400` invalid upload/revision, `401` invalid session, `404` missing/foreign document, `409` stale revision, `413` file/account limit, `429` account-user rate limit (shared 10 requests per 5 minutes). Validation, conflict, and quota responses include ProblemDetails `detail`. A quota race cannot allow simultaneous uploads to exceed the account limit.
+- Deleting an account cascade-deletes its documents. There is no automatic upload, PDF-only import, or version history; updates replace the PDF and editable ZIP together.
+
 ### Auth — `/api/auth`
 
 #### `POST /api/auth/refresh`

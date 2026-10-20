@@ -1,0 +1,72 @@
+@baseUrl = http://localhost:5050
+@token = paste-local-access-token
+@title = My game
+
+### List owned documents and storage usage
+GET {{baseUrl}}/api/gdd-documents
+Authorization: Bearer {{token}}
+
+### Create: place the matching generated PDF/draft ZIP beside this file locally.
+# Do not commit those personal files. Set title to the form's game title.
+# @name create
+POST {{baseUrl}}/api/gdd-documents
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=gdd-boundary
+
+--gdd-boundary
+Content-Disposition: form-data; name="title"
+
+{{title}}
+--gdd-boundary
+Content-Disposition: form-data; name="pdf"; filename="game.pdf"
+Content-Type: application/pdf
+
+< ./game.pdf
+--gdd-boundary
+Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
+Content-Type: application/zip
+
+< ./game-draft.zip
+--gdd-boundary--
+
+### Read metadata
+GET {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}
+Authorization: Bearer {{token}}
+
+### Download a consistent PDF/draft pair at the same revision
+GET {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}/pdf?revision={{create.response.body.$.revision}}
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}/draft?revision={{create.response.body.$.revision}}
+Authorization: Bearer {{token}}
+
+### Replace both files atomically; repeating with the old revision returns 409
+# @name update
+PUT {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=gdd-boundary
+
+--gdd-boundary
+Content-Disposition: form-data; name="title"
+
+{{title}}
+--gdd-boundary
+Content-Disposition: form-data; name="revision"
+
+{{create.response.body.$.revision}}
+--gdd-boundary
+Content-Disposition: form-data; name="pdf"; filename="game.pdf"
+Content-Type: application/pdf
+
+< ./game.pdf
+--gdd-boundary
+Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
+Content-Type: application/zip
+
+< ./game-draft.zip
+--gdd-boundary--
+
+### Delete the updated revision
+DELETE {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}?revision={{update.response.body.$.revision}}
+Authorization: Bearer {{token}}

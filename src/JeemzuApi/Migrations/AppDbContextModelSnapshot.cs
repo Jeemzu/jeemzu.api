@@ -83,6 +83,50 @@ namespace JeemzuApi.Migrations
                     b.ToTable("BudgetSnapshots");
                 });
 
+            modelBuilder.Entity("JeemzuApi.Models.GddDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DraftBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("DraftData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<long>("PdfBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("PdfData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "UpdatedAt");
+
+                    b.ToTable("GddDocuments");
+                });
+
             modelBuilder.Entity("JeemzuApi.Models.KnowledgeChunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -295,6 +339,17 @@ namespace JeemzuApi.Migrations
                 });
 
             modelBuilder.Entity("JeemzuApi.Models.BudgetSnapshot", b =>
+                {
+                    b.HasOne("JeemzuApi.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JeemzuApi.Models.GddDocument", b =>
                 {
                     b.HasOne("JeemzuApi.Models.User", "User")
                         .WithMany()

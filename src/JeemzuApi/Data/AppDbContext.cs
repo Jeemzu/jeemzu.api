@@ -15,10 +15,22 @@ public class AppDbContext : DbContext
     public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
     public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
     public DbSet<BudgetCapabilityGap> BudgetCapabilityGaps => Set<BudgetCapabilityGap>();
+    public DbSet<GddDocument> GddDocuments => Set<GddDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<GddDocument>(entity =>
+        {
+            entity.HasKey(document => document.Id);
+            entity.Property(document => document.Title).IsRequired().HasMaxLength(100);
+            entity.Property(document => document.PdfData).IsRequired();
+            entity.Property(document => document.DraftData).IsRequired();
+            entity.HasIndex(document => new { document.UserId, document.UpdatedAt });
+            entity.HasOne(document => document.User).WithMany()
+                .HasForeignKey(document => document.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         // Ensure the pgvector extension exists in the database.
         // EF will emit "CREATE EXTENSION IF NOT EXISTS vector" in the migration.

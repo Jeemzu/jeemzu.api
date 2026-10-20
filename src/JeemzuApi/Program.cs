@@ -13,6 +13,12 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (args.Length > 0 && args[0] == "--reset-local-admin-password")
+{
+    Environment.ExitCode = await LocalAdminPasswordReset.RunAsync(builder.Configuration, args);
+    return;
+}
+
 // ── Services ──────────────────────────────────────────────────────────────────
 
 builder.Services.AddControllers();
@@ -60,6 +66,7 @@ builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IGddDocumentService, GddDocumentService>();
 
 // Resend email service — used by POST /api/contact and the account verification/reset emails.
 // Key is optional at startup; EmailService will return 503 if unconfigured.
