@@ -1,0 +1,43 @@
+@baseUrl = http://localhost:5050
+@token = replace-with-signed-in-user-access-token
+
+### Propose a temporary rent pause; nothing is saved or applied by this request.
+POST {{baseUrl}}/api/budget/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "question": "My rent is covered for October and November 2026. Pause those payments.",
+  "history": [],
+  "today": "2026-10-01",
+  "strategy": "minimum",
+  "budget": {
+    "people": [],
+    "bills": [
+      {
+        "id": "rent",
+        "name": "Rent",
+        "amountCents": 125000,
+        "dueDay": 1,
+        "paidFrom": "shared",
+        "frequency": "monthly"
+      }
+    ],
+    "debts": [],
+    "overrides": [],
+    "oneOffs": [],
+    "personalExpenses": [],
+    "essentialsBalanceCents": 300000,
+    "autopayBalanceCents": 0
+  },
+  "projection": {
+    "people": [],
+    "weeks": []
+  }
+}
+
+### Guests are rejected with 401 before a provider call.
+POST {{baseUrl}}/api/budget/chat
+Content-Type: application/json
+
+{}

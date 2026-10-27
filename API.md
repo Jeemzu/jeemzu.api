@@ -503,6 +503,17 @@ Returned by the summary endpoint.
 
 ---
 
+## Budgetize assistant - `/api/budget/chat`
+
+- Authenticated `POST` with `{question, history, budget, projection, today, strategy}`; the endpoint and approval-only browser flow are unchanged.
+- `question`: 1-2,000 characters; `history`: up to 40 user/assistant messages, 8,000 characters/turn and 64,000 combined. The workflow reads only the last six. `today` is a real `yyyy-mm-dd` date; strategy is `suggested` or `minimum`.
+- `budget` is the current unsaved `BudgetDataDto`; `projection` is the client's authoritative weekly forecast. People must match the budget, with at most 32 weeks. Daily ledgers are omitted from prompts; compact context is limited to 150,000 characters.
+- Response: `{answer, intent, proposal, capabilityGap}`, where intent is `question`, `change_request` or `unsupported`. A proposal is `{summary, ops}` (up to 25 operations); optional operation fields are omitted, never null. Existing IDs and whole-cent amounts are validated before returning proposals.
+- The native .NET router and selected analyst/planner/gap stage each make one structured completion with the dedicated Budgetize key/model. The server never applies operations or saves gaps: preview/apply and `POST /api/budget/gaps` remain separate.
+- Errors: `400` invalid input/context, `401` unauthorized, `413` body over 2 MB, `429` account/process capacity, `502` provider/structured-output failure, `503` missing dedicated key, `504` 90-second deadline. Controller errors use Problem Details; middleware limits/authentication may return empty bodies. Results are not cached.
+- Limit: 12 requests/account/5 minutes and four active workflows/process, no queue. Configuration health is exposed to admins without a billed provider check.
+- See [Budgetize workflow and deployment](README.md#budgetize-assistant-net) for supported operations and retiring the former service.
+
 ## Environment variables (Render)
 
 | Variable                               | Purpose                                                                        |
@@ -513,8 +524,9 @@ Returned by the summary endpoint.
 | `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                              |
 | `OpenAI__ApiKey`                       | Profile chatbot completions and embeddings                                     |
 | `OpenAI__GddApiKey`                    | Dedicated GDD assistant key; missing/blank disables only GDD AI (`503`)          |
-| `Agents__BaseUrl`                      | Private-network address of the Python agents service                           |
-| `InternalApiKey`                       | Shared secret the agents service sends as `X-Internal-Key`                     |
+| `OpenAI__BudgetApiKey`                 | Dedicated native Budgetize key; missing/blank disables only Budgetize AI (`503`) |
+| `OpenAI__BudgetModel`                  | Model for every Budgetize stage (default `gpt-6-luna`)                         |
+| `InternalApiKey`                       | Existing knowledge-search `X-Internal-Key` contract (not used by Budgetize)     |
 | `Resend__ApiKey`                       | Enables contact, verification, and password reset email                        |
 | `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)                  |
 | `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`)       |

@@ -3,7 +3,7 @@
 # Every secret is `sync: false`: Render prompts for the value once and stores it in the
 # dashboard, so nothing sensitive is ever committed. Both repos are public.
 #
-# All three resources must share one region or the private network will not resolve.
+# The API and database must share one region for private-network connectivity.
 
 databases:
   - name: jeemzu-db-instance
@@ -30,7 +30,6 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      # Pinned so the private-network address below stays deterministic.
       - key: PORT
         value: "8080"
 
@@ -39,10 +38,6 @@ services:
       #   Host=<internal-host>;Port=5432;Database=jeemzudb;Username=jeemzu;Password=<pw>;SSL Mode=Require;Trust Server Certificate=true
       - key: ConnectionStrings__DefaultConnection
         sync: false
-
-      # Private-network address of the agents service. Confirm against the Render dashboard.
-      - key: Agents__BaseUrl
-        value: http://jeemzu-agents:8000
 
       - key: Frontend__BaseUrl
         value: https://jeemzu.me
@@ -56,6 +51,8 @@ services:
         value: gpt-6-luna
       - key: OpenAI__GddModel
         value: gpt-6-luna
+      - key: OpenAI__BudgetModel
+        value: gpt-6-luna
       - key: OpenAI__EmbeddingModel
         value: text-embedding-3-small
 
@@ -64,6 +61,8 @@ services:
       - key: OpenAI__ApiKey
         sync: false
       - key: OpenAI__GddApiKey
+        sync: false
+      - key: OpenAI__BudgetApiKey
         sync: false
       - key: InternalApiKey
         sync: false
@@ -81,33 +80,4 @@ services:
       - key: Seed__AdminEmail
         sync: false
       - key: Seed__AdminPassword
-        sync: false
-
-  # ── Private agents service (no public hostname) ─────────────────────────────
-  - type: pserv
-    name: jeemzu-agents
-    runtime: docker
-    region: virginia
-    plan: starter
-    branch: main
-    autoDeploy: true
-    dockerfilePath: ./agents/Dockerfile
-    dockerContext: ./agents
-    envVars:
-      - key: PORT
-        value: "8000"
-      - key: DOTNET_API_URL
-        value: http://jeemzu-api:8080/api
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
-      - key: OPENAI_MODEL_PLANNER
-        value: gpt-4.1
-      - key: OPENAI_MODEL_FAST
-        value: gpt-4.1-mini
-
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: INTERNAL_API_KEY
-        sync: false
-      - key: TAVILY_API_KEY
         sync: false

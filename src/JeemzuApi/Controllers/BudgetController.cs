@@ -7,6 +7,8 @@ using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.SemanticKernel;
 
 namespace JeemzuApi.Controllers;
 
@@ -22,12 +24,12 @@ public class BudgetController : ControllerBase
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly AppDbContext _db;
-    private readonly IBudgetAgentProxyService _assistant;
+    private readonly IBudgetAssistantService _assistant;
     private readonly ILogger<BudgetController> _logger;
 
     public BudgetController(
         AppDbContext db,
-        IBudgetAgentProxyService assistant,
+        IBudgetAssistantService assistant,
         ILogger<BudgetController> logger)
     {
         _db = db;
@@ -140,6 +142,16 @@ public class BudgetController : ControllerBase
     /// </summary>
     [HttpPost("chat")]
     [RequestSizeLimit(2_000_000)]
+    [EnableRateLimiting("budget-assistant")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<BudgetChatResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status504GatewayTimeout)]
     public async Task<ActionResult<BudgetChatResult>> Chat(
         [FromBody] BudgetChatRequest request,
         CancellationToken ct)
@@ -147,25 +159,33 @@ public class BudgetController : ControllerBase
         var userId = await ResolveUserIdAsync(ct);
         if (userId is null) return Unauthorized();
 
+        var error = BudgetAssistantContext.Validate(request);
+        if (error is not null) return Problem(statusCode: 400, detail: error);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(90));
         try
         {
-            var result = await _assistant.ChatAsync(new BudgetChatPayload
-            {
-                Question = request.Question,
-                History = request.History,
-                Budget = request.Budget,
-                Projection = request.Projection,
-                Today = request.Today,
-                Strategy = request.Strategy,
-            }, ct);
-
-            return Ok(result);
+            return Ok(await _assistant.ChatAsync(request, timeout.Token));
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        catch (BudgetAssistantUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Budget assistant call failed");
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { message = "The budget assistant is unavailable right now." });
+            _logger.LogWarning(ex, "Budget assistant dedicated key is not configured.");
+            return Problem(statusCode: 503, detail: "The Budgetize assistant is not configured. Set its dedicated OpenAI key on the server.");
+        }
+        catch (BudgetAssistantBusyException ex)
+        {
+            _logger.LogWarning(ex, "Budget assistant concurrency limit reached.");
+            return Problem(statusCode: 429, detail: "The Budgetize assistant is busy. Wait a moment and try again.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Budget assistant request timed out.");
+            return Problem(statusCode: 504, detail: "The Budgetize assistant timed out. Your budget is unchanged; try again.");
+        }
+        catch (Exception ex) when (ex is HttpOperationException or HttpRequestException or InvalidDataException)
+        {
+            _logger.LogWarning(ex, "Budget assistant completion failed.");
+            return Problem(statusCode: 502, detail: "The Budgetize assistant could not produce a valid response. Your budget is unchanged; try again.");
         }
     }
 

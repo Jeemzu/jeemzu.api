@@ -1,6 +1,6 @@
 name: Notify frontend of API changes
 
-# Render builds and deploys both services straight from this repo on push to main
+# Render builds and deploys the API straight from this repo on push to main
 # (see render.yaml), so CI only has to tell the frontend to regenerate its API types.
 
 on:

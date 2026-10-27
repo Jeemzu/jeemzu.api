@@ -142,7 +142,7 @@ public class AdminController : ControllerBase
         }).ToList());
     }
 
-    /// <summary>Check health of external services (agent, database).</summary>
+    /// <summary>Check database health and local Budgetize configuration (no billed provider probe).</summary>
     [HttpGet("health")]
     public async Task<ActionResult<List<ServiceHealthStatus>>> HealthCheck(CancellationToken ct)
     {
@@ -165,27 +165,13 @@ public class AdminController : ControllerBase
         }
         results.Add(dbStatus);
 
-        // Python agent service, reachable only over the private network
-        var agentUrl = _configuration["Agents:BaseUrl"];
-        if (!string.IsNullOrEmpty(agentUrl))
+        var budgetConfigured = !string.IsNullOrWhiteSpace(_configuration["OpenAI:BudgetApiKey"]);
+        results.Add(new ServiceHealthStatus
         {
-            var agentStatus = new ServiceHealthStatus { Service = "Agents" };
-            try
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var resp = await http.GetAsync($"{agentUrl}/health", ct);
-                sw.Stop();
-                agentStatus.Healthy = resp.IsSuccessStatusCode;
-                agentStatus.ResponseTimeMs = (int)sw.ElapsedMilliseconds;
-            }
-            catch (Exception ex)
-            {
-                agentStatus.Healthy = false;
-                agentStatus.Error = ex.Message;
-            }
-            results.Add(agentStatus);
-        }
+            Service = "Budgetize configuration (not provider availability)",
+            Healthy = budgetConfigured,
+            Error = budgetConfigured ? null : "OpenAI:BudgetApiKey is not configured.",
+        });
 
         return Ok(results);
     }

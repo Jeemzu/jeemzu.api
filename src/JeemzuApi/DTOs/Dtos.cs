@@ -659,7 +659,7 @@ public class BudgetChatRequest
     [MaxLength(2000)]
     public string Question { get; set; } = string.Empty;
 
-    [MaxLength(40)]
+    [Required, MaxLength(40)]
     public List<ConversationMessage> History { get; set; } = [];
 
     /// <summary>
@@ -669,7 +669,7 @@ public class BudgetChatRequest
     [Required]
     public BudgetDataDto Budget { get; set; } = new();
 
-    /// <summary>Opaque to this API — forwarded to the assistant as the client produced it.</summary>
+    /// <summary>Authoritative client-computed forecast, read by the .NET assistant without recomputing it.</summary>
     [Required]
     public JsonElement Projection { get; set; }
 
@@ -677,31 +677,9 @@ public class BudgetChatRequest
     [RegularExpression(BudgetRecurrence.DatePattern)]
     public string Today { get; set; } = string.Empty;
 
+    [Required]
     [RegularExpression("^(suggested|minimum)$")]
     public string Strategy { get; set; } = "suggested";
-}
-
-/// <summary>Payload forwarded to the Python assistant service.</summary>
-public class BudgetChatPayload
-{
-    public string Question { get; set; } = string.Empty;
-    public List<ConversationMessage> History { get; set; } = [];
-    public BudgetDataDto Budget { get; set; } = new();
-    public JsonElement Projection { get; set; }
-    public string Today { get; set; } = string.Empty;
-    public string Strategy { get; set; } = "suggested";
-}
-
-/// <summary>
-/// The assistant's reply. Proposal and gap stay as raw JSON: the assistant already
-/// emits the client's own shapes, so re-modelling them here would only add drift.
-/// </summary>
-public class BudgetChatResult
-{
-    public string Answer { get; set; } = string.Empty;
-    public string Intent { get; set; } = string.Empty;
-    public JsonElement? Proposal { get; set; }
-    public JsonElement? CapabilityGap { get; set; }
 }
 
 /// <summary>Request body for POST /api/budget/gaps.</summary>

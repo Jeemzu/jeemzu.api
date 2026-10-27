@@ -1,6 +1,6 @@
 # jeemzu.api
 
-ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](https://jeemzu.me). Handles leaderboards, user accounts, JWT auth, and RAG-powered AI chat with intelligent agent routing.
+ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles leaderboards, accounts, JWT auth, RAG profile chat, and native GDD/Budgetize AI workflows.
 
 ## Stack
 
@@ -9,13 +9,12 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 | Framework        | ASP.NET Core 8 (controller-based)                                    |
 | ORM              | Entity Framework Core 8 (Npgsql)                                     |
 | Database         | PostgreSQL 16 + pgvector (HNSW cosine index)                         |
-| AI/LLM           | Semantic Kernel 1.77 — GPT-4o-mini + text-embedding-3-small          |
-| Agent service    | Python 3.11, FastAPI, LangGraph, LangChain                           |
+| AI/LLM           | Semantic Kernel 1.77 — GPT-6 Luna + text-embedding-3-small          |
 | Auth             | JWT Bearer (HMAC-SHA256, 60 min) + httpOnly refresh cookie (30 days) |
 | Password hashing | BCrypt (work factor 12)                                              |
 | API docs         | Swagger/OpenAPI (Swashbuckle)                                        |
 | Containerization | Docker multi-stage (runtime: port 8080)                              |
-| Hosting          | Render (Docker web service + private service)                        |
+| Hosting          | Render (Docker web service)                                          |
 | Database (prod)  | Render Managed PostgreSQL 16 + pgvector                              |
 | Database (dev)   | Docker Compose (`pgvector/pgvector:pg16`, port 5432)                 |
 | CI/CD            | Render auto-deploy from `main` (see `render.yaml`)                   |
@@ -24,25 +23,24 @@ ASP.NET Core 8 Web API + Python multi-agent service — backend for [jeemzu.me](
 
 | Service           | Responsibility                                                                                                                                                                                       |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Render            | Hosts everything: the ASP.NET Core API as a public web service at `api.jeemzu.me`, the Python agents as a private service with no public hostname, and managed PostgreSQL. Defined in `render.yaml`. |
+| Render            | Hosts the ASP.NET Core API at `api.jeemzu.me` and managed PostgreSQL, defined in `render.yaml`. |
 | Render PostgreSQL | Production database for users, scores, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
-| OpenAI            | Supplies chat completions and text embeddings to the .NET RAG API and the Python agents. API keys are provided through deployment configuration.                                                     |
-| Tavily            | Optional web-search provider used by the chatbot agent for current or general-topic queries; requires `TAVILY_API_KEY`.                                                                              |
+| OpenAI            | Supplies completions and embeddings to .NET. Profile, GDD and Budgetize keys are configured independently. |
 | Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
 | GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
 
-The agents service is reachable only over Render's private network; the browser never calls it directly.
+All AI workflows run inside the .NET API; the browser never receives provider keys.
 
 ### Local-Only Infrastructure
 
-Docker Compose starts PostgreSQL and the Python agents service for local development.
+Docker Compose starts PostgreSQL for local development.
 
 ## API Endpoints
 
 ### GDD assistant - `/api/gdd-assistant`
 
 - Authenticated, stateless checkpoint collaboration, separate from the profile RAG chatbot. Text and compressed image references go to OpenAI only on an explicit proposal request; URLs are context only, never fetched.
-- `OpenAI:GddModel` and `OpenAI:ChatModel` independently default to `gpt-6-luna`; Render uses `OpenAI__GddModel` and `OpenAI__ChatModel`. Existing user-secrets/environment overrides still take precedence. The private Python/Budgetize model settings are unchanged.
+- `OpenAI:GddModel`, `OpenAI:ChatModel` and `OpenAI:BudgetModel` independently default to `gpt-6-luna`; Render uses double underscores instead of colons. User-secrets/environment overrides take precedence.
 - GDD completions use the separate `OpenAI:GddApiKey` secret (`OpenAI__GddApiKey` in Render), allowing usage attribution by key. Missing/blank disables only GDD AI with `503`, without falling back to `OpenAI:ApiKey`. Set the local secret with `dotnet user-secrets set "OpenAI:GddApiKey" "<your-gdd-key>" --project src\JeemzuApi`; set the production value in Render, then restart/redeploy. Do not commit the key or expose it through `VITE_` variables.
 - The assistant returns structured, checkpoint-scoped proposals; approval and resumable workflow state live in the editable ZIP. No database migration or provider-side conversation/file storage is added. The profile chatbot retains its RAG grounding with a 1,200-token output cap; GDD requests have a 10,000-token cap. GPT-6 models use `reasoning_effort: none` for both workflows.
 - Deploy the API and update model overrides before deploying the assistant UI. Confirm the selected models are available to the deployment's OpenAI project. See [API.md](API.md#gdd-assistant---apigdd-assistant) and [gdd-assistant.http](gdd-assistant.http).
@@ -142,44 +140,18 @@ No database migration is needed.
 | ------ | --------- | ----------------------------- |
 | `GET`  | `/health` | PostgreSQL connectivity check |
 
-## Agent Service (Python)
+## Budgetize Assistant (.NET)
 
-LangGraph-based multi-agent orchestration for intelligent chat routing. Runs as a sidecar in Docker Compose on port 8001.
-
-### Architecture
-
-```
-User question → POST /chat
-    ↓
-Router (classifies query type)
-    ↓
-Parallel agent execution:
-  ├── knowledge — vector search + LLM (personal/skills/projects)
-  ├── game_stats — tool calls to .NET API (leaderboards, user profiles)
-  ├── web_search — Tavily API (general topics, current events)
-  └── chitchat — direct LLM (greetings, small talk)
-    ↓
-Synthesizer (combines outputs) → final answer
-```
-
-### Agent Nodes
-
-| Node          | Purpose                                                       |
-| ------------- | ------------------------------------------------------------- |
-| `router`      | Classifies query → selects agents to invoke                   |
-| `knowledge`   | Answers about James's skills, experience, projects, education |
-| `game_stats`  | Live leaderboard queries, game scores, user profiles          |
-| `web_search`  | External search for general topics and current events         |
-| `synthesizer` | Combines all agent outputs into a coherent response           |
-
-### Tools
-
-| Tool              | Target                                                         |
-| ----------------- | -------------------------------------------------------------- |
-| `knowledge_tool`  | Vector search against `KnowledgeChunk` table                   |
-| `scores_tool`     | `GET /api/scores/{gameId}`, `GET /api/scores/{gameId}/summary` |
-| `users_tool`      | `GET /api/users/{username}`                                    |
-| `web_search_tool` | Tavily web search API                                          |
+- `POST /api/budget/chat` remains authenticated and stateless: the browser sends its current unsaved budget and authoritative projection.
+- Semantic Kernel runs router → analyst, planner or capability-gap reporter → deterministic proposal validation. Every request makes at most two model calls; all stages use `OpenAI:BudgetModel` (default `gpt-6-luna`).
+- Set `OpenAI:BudgetApiKey` locally with user-secrets, or `OpenAI__BudgetApiKey` on Render's **jeemzu-api** service. Missing/blank returns `503` for Budgetize only; there is no fallback to another key.
+- The last six conversation turns and weekly projection (without duplicated daily ledgers) are included. Context is capped at 150,000 characters, output at 500 routing / 2,000 analysis / 6,000 planning / 1,500 gap tokens.
+- Only the existing 11 operations are supported. IDs, dates, recurrence, account ownership, cents and ranges are validated; rejected operations are explained. Nullable operation fields are omitted on the wire so partial updates cannot erase existing values.
+- Nothing is applied server-side. The existing browser projection preview and explicit Apply action remain authoritative; capability gaps still use `POST /api/budget/gaps`.
+- Limits: 12 requests/account/5 minutes, four concurrent workflows/process with no queue, 90-second deadline. Admin health reports local configuration only, not provider availability, without billed probes.
+- No Python runtime, agent service, Tavily integration or database migration is needed. The profile chatbot remains the separate .NET RAG workflow.
+- Offline focused checks: `dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj -c Release --filter FullyQualifiedName~BudgetAssistant`.
+- Manual authenticated request: [budget-assistant.http](budget-assistant.http). Requesting a proposal makes billed provider calls but does not apply or save changes.
 
 ## Database Schema
 
@@ -224,17 +196,7 @@ src/JeemzuApi/
 ├── Program.cs               # DI + middleware pipeline
 └── appsettings.json
 
-agents/                      # Python multi-agent service
-├── main.py                  # FastAPI server (POST /chat)
-├── graph.py                 # LangGraph state machine
-├── state.py                 # AgentState TypedDict
-├── config.py                # Environment config
-├── nodes/                   # Router, Knowledge, GameStats, WebSearch, Synthesizer
-├── tools/                   # knowledge_tool, scores_tool, users_tool, web_search_tool
-├── pyproject.toml
-└── Dockerfile
-
-docker-compose.yml           # PostgreSQL + agents service
+docker-compose.yml           # PostgreSQL
 Dockerfile                   # .NET API multi-stage build
 .github/workflows/deploy.yml # Notifies the frontend to regenerate API types
 ```
@@ -258,10 +220,9 @@ All business services are **scoped**. AI services (`Kernel`, `IChatCompletionSer
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL + agents)
-- [Python 3.11+](https://www.python.org/) (for agents service, optional)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL)
 
-### 1. Start the database + agents
+### 1. Start the database
 
 ```bash
 docker compose up -d
@@ -270,7 +231,6 @@ docker compose up -d
 Starts:
 
 - PostgreSQL 16 on port **5432** (`jeemzu` / `jeemzu_dev_password` / `jeemzu_db`)
-- Agents service on port **8001** (FastAPI + LangGraph)
 
 ### 2. Configure secrets
 
@@ -281,6 +241,8 @@ dotnet user-secrets set "Jwt:Secret" "<256-bit-key>"
 dotnet user-secrets set "Jwt:Issuer" "jeemzu-api"
 dotnet user-secrets set "Jwt:Audience" "jeemzu-frontend"
 dotnet user-secrets set "OpenAI:ApiKey" "<your-key>"
+dotnet user-secrets set "OpenAI:BudgetApiKey" "<your-budget-key>"
+dotnet user-secrets set "OpenAI:GddApiKey" "<your-gdd-key>"
 
 # Optional — required only to actually deliver verification / password reset emails
 dotnet user-secrets set "Resend:ApiKey" "<your-key>"
@@ -319,16 +281,6 @@ dotnet run --project src/JeemzuApi
 - Health check: http://localhost:5050/health
 - Migrations apply automatically on startup
 
-### 4. Run agents locally (without Docker)
-
-```bash
-cd agents
-pip install -e .
-uvicorn main:app --port 8001
-```
-
-Requires `.env` with `OPENAI_API_KEY`, `DOTNET_API_URL`, `TAVILY_API_KEY`.
-
 ## EF Migrations
 
 ```bash
@@ -346,17 +298,25 @@ dotnet tool install --global dotnet-ef
 
 ### Render
 
-`render.yaml` defines the whole stack: the public `jeemzu-api` web service, the private
-`jeemzu-agents` service, and the managed PostgreSQL instance. All three live in the same region so
-the private network resolves. Pushing to `main` triggers an auto-deploy of both services.
+`render.yaml` defines the public `jeemzu-api` service and managed PostgreSQL in the same region.
+Pushing to `main` triggers the API auto-deploy; Blueprint synchronization is separate.
 
 Secrets are marked `sync: false` in the Blueprint, so their values live in the Render dashboard and
 are never committed.
 
+#### Retiring the former agents service
+
+1. Sync the Blueprint and set **jeemzu-api**'s dedicated `OpenAI__BudgetApiKey` (and `OpenAI__GddApiKey` for GDD). Check `OpenAI__BudgetModel=gpt-6-luna`; verify model access in the key's OpenAI project.
+2. Deploy the API. Confirm Budgetize can answer a question and preview/apply a temporary override, and inspect local configuration at `/api/admin/health`.
+3. Manually delete the existing **jeemzu-agents** service in Render after verification. Removing it from the Blueprint does not delete a deployed resource or stop its billing.
+4. Remove stale `Agents__BaseUrl` from the API dashboard if retained. The retired service's `OPENAI_MODEL*`, `OPENAI_API_KEY`, `DOTNET_API_URL` and `TAVILY_API_KEY` no longer configure any current workflow. Revoke its provider credentials when no longer used elsewhere.
+
+`InternalApiKey` remains for the existing `/api/knowledge/search` contract, not Budgetize; its authentication is unchanged. Ignored local files such as `agents/.env` are not deleted by the source migration; they are excluded from the Docker context.
+
 ### CI/CD (GitHub Actions)
 
 On push to `main`, the workflow only dispatches `api-types-update` to the `jeemzu.me` repo so the
-frontend regenerates its OpenAPI types. Render builds and deploys the containers itself.
+frontend regenerates its OpenAPI types. Render builds and deploys the API container itself.
 
 ### Render Configuration
 
@@ -365,7 +325,8 @@ Service env vars:
 - `ConnectionStrings__DefaultConnection` — Npgsql keyword form; Render's `postgres://` URI will not parse
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
 - `OpenAI__ApiKey`
-- `Agents__BaseUrl` — private-network address of the agents service
+- `OpenAI__BudgetApiKey`, `OpenAI__GddApiKey` — dedicated keys, with no fallback
+- `OpenAI__BudgetModel`, `OpenAI__GddModel`, `OpenAI__ChatModel` — independently configurable, default `gpt-6-luna`
 - `Resend__ApiKey`, `Resend__AccountFrom` — account verification and password reset email
 - `Frontend__BaseUrl` — base URL used to build verification and reset links
 - `Seed__AdminUsername`, `Seed__AdminEmail`, `Seed__AdminPassword` — one-time admin bootstrap
@@ -374,5 +335,5 @@ Service env vars:
 
 ### CORS
 
-Allowed origins: `jeemzu.me`, `www.jeemzu.me`, `localhost:5173`, `localhost:8001`
+Allowed origins: `jeemzu.me`, `www.jeemzu.me`, `localhost:5173`
 Credentials enabled (required for httpOnly refresh cookie).

@@ -82,6 +82,15 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    options.AddPolicy("budget-assistant", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.Identity?.Name ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 12,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0,
+        }));
+
     options.AddPolicy("gdd-assistant", context => RateLimitPartition.GetFixedWindowLimiter(
         context.User.Identity?.Name ?? "anonymous",
         _ => new FixedWindowRateLimiterOptions
@@ -112,14 +121,7 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
-// Python agent service — one FastAPI app serving both the chatbot and the Budgetize
-// assistant. The planner node can take a while on a large budget, so the timeout is generous.
-var agentsBaseUrl = builder.Configuration["Agents:BaseUrl"] ?? "http://localhost:8001";
-builder.Services.AddHttpClient<IBudgetAgentProxyService, BudgetAgentProxyService>(client =>
-{
-    client.BaseAddress = new Uri(agentsBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+builder.Services.AddBudgetAssistant(builder.Configuration);
 
 // ── Semantic Kernel + OpenAI ─────────────────────────────────────────────────
 // The Kernel and the LLM/embedding service instances are singletons: they hold
@@ -193,8 +195,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "https://jeemzu.me",
                 "https://www.jeemzu.me",
-                "http://localhost:5173",  // Vite default port
-                "http://localhost:8001"   // Python agent service
+                "http://localhost:5173"  // Vite default port
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
