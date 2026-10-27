@@ -39,6 +39,16 @@ Docker Compose starts PostgreSQL and the Python agents service for local develop
 
 ## API Endpoints
 
+### GDD assistant - `/api/gdd-assistant`
+
+- Authenticated, stateless checkpoint collaboration, separate from the profile RAG chatbot. Text and compressed image references go to OpenAI only on an explicit proposal request; URLs are context only, never fetched.
+- `OpenAI:GddModel` and `OpenAI:ChatModel` independently default to `gpt-6-luna`; Render uses `OpenAI__GddModel` and `OpenAI__ChatModel`. Existing user-secrets/environment overrides still take precedence. The private Python/Budgetize model settings are unchanged.
+- GDD completions use the separate `OpenAI:GddApiKey` secret (`OpenAI__GddApiKey` in Render), allowing usage attribution by key. Missing/blank disables only GDD AI with `503`, without falling back to `OpenAI:ApiKey`. Set the local secret with `dotnet user-secrets set "OpenAI:GddApiKey" "<your-gdd-key>" --project src\JeemzuApi`; set the production value in Render, then restart/redeploy. Do not commit the key or expose it through `VITE_` variables.
+- The assistant returns structured, checkpoint-scoped proposals; approval and resumable workflow state live in the editable ZIP. No database migration or provider-side conversation/file storage is added. The profile chatbot retains its RAG grounding with a 1,200-token output cap; GDD requests have a 10,000-token cap. GPT-6 models use `reasoning_effort: none` for both workflows.
+- Deploy the API and update model overrides before deploying the assistant UI. Confirm the selected models are available to the deployment's OpenAI project. See [API.md](API.md#gdd-assistant---apigdd-assistant) and [gdd-assistant.http](gdd-assistant.http).
+- Provider-wire and authenticated endpoint tests are offline and need no PostgreSQL or real API key:
+  `dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj --configuration Release --filter FullyQualifiedName~GddAssistant`
+
 ### GDD library - `/api/gdd-documents`
 
 - Authenticated users can store multiple named documents as a generated PDF plus an editable draft ZIP containing original images. Binary data stays in PostgreSQL; no new storage service is required.

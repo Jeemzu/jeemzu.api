@@ -1,5 +1,6 @@
 using JeemzuApi.DTOs;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace JeemzuApi.Services;
 
@@ -8,15 +9,28 @@ public class ChatService : IChatService
     private readonly IEmbeddingService _embedding;
     private readonly IVectorStoreService _vectorStore;
     private readonly IChatCompletionService _chat;
+    private readonly OpenAIPromptExecutionSettings _settings;
 
     public ChatService(
         IEmbeddingService embedding,
         IVectorStoreService vectorStore,
-        IChatCompletionService chat)
+        IChatCompletionService chat,
+        IConfiguration configuration)
     {
         _embedding = embedding;
         _vectorStore = vectorStore;
         _chat = chat;
+        var model = configuration["OpenAI:ChatModel"] ?? "gpt-6-luna";
+        _settings = new OpenAIPromptExecutionSettings
+        {
+            MaxTokens = 1200,
+        };
+        if (model.StartsWith("gpt-6", StringComparison.Ordinal))
+        {
+#pragma warning disable OPENAI001 // Use the SDK's extensible reasoning value; SK's string allowlist predates "none".
+            _settings.ReasoningEffort = new OpenAI.Chat.ChatReasoningEffortLevel("none");
+#pragma warning restore OPENAI001
+        }
     }
 
     public async Task<string> ChatAsync(
@@ -61,7 +75,7 @@ public class ChatService : IChatService
         chatHistory.AddUserMessage(question);
 
         // Step 6 — Generate the response
-        var response = await _chat.GetChatMessageContentAsync(chatHistory, cancellationToken: ct);
+        var response = await _chat.GetChatMessageContentAsync(chatHistory, _settings, cancellationToken: ct);
         return response.Content ?? "I was unable to generate a response. Please try again.";
     }
 }

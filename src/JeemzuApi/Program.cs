@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Resend;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -81,6 +82,15 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    options.AddPolicy("gdd-assistant", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.Identity?.Name ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 12,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0,
+        }));
+
     // Signed-in actions partition by username, so one user can never throttle another.
     options.AddPolicy("account-user", context => RateLimitPartition.GetFixedWindowLimiter(
         context.User.Identity?.Name ?? "anonymous",
@@ -116,7 +126,9 @@ builder.Services.AddHttpClient<IBudgetAgentProxyService, BudgetAgentProxyService
 // no per-request state and the underlying HTTP clients are designed to be reused.
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured. Set it via: dotnet user-secrets set \"OpenAI:ApiKey\" \"<key>\"");
-var chatModel = builder.Configuration["OpenAI:ChatModel"] ?? "gpt-4o-mini";
+var chatModel = builder.Configuration["OpenAI:ChatModel"] ?? "gpt-6-luna";
+var gddModel = builder.Configuration["OpenAI:GddModel"] ?? "gpt-6-luna";
+var gddApiKey = builder.Configuration["OpenAI:GddApiKey"];
 var embeddingModel = builder.Configuration["OpenAI:EmbeddingModel"] ?? "text-embedding-3-small";
 
 #pragma warning disable SKEXP0010 // AddOpenAIEmbeddingGenerator is experimental in SK 1.x but stable in practice
@@ -128,6 +140,16 @@ var kernel = Kernel.CreateBuilder()
 
 builder.Services.AddSingleton(kernel);
 builder.Services.AddSingleton(kernel.Services.GetRequiredService<IChatCompletionService>());
+if (!string.IsNullOrWhiteSpace(gddApiKey))
+{
+    builder.Services.AddKeyedSingleton<IChatCompletionService>("gdd-assistant",
+        new OpenAIChatCompletionService(gddModel, gddApiKey));
+    builder.Services.AddScoped<IGddAssistantService, GddAssistantService>();
+}
+else
+{
+    builder.Services.AddScoped<IGddAssistantService, UnconfiguredGddAssistantService>();
+}
 builder.Services.AddSingleton(kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>());
 
 // RAG services — Scoped so they share the DbContext per request

@@ -1,0 +1,42 @@
+@baseUrl = http://localhost:5050
+@accessToken = replace-with-local-access-token
+
+### Propose the concept checkpoint (503 if OpenAI:GddApiKey is missing; explicit approval happens in the editor)
+POST {{baseUrl}}/api/gdd-assistant
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "checkpoint": "concept",
+  "prompt": "Help design a small exploration game about restoring an abandoned island.",
+  "document": "# Island game",
+  "history": [],
+  "references": [
+    { "name": "Design constraints", "text": "Solo developer; one island; Windows first.", "url": "", "imageBase64": "" }
+  ]
+}
+
+### Invalid checkpoint returns 400 without calling the model
+POST {{baseUrl}}/api/gdd-assistant
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "checkpoint": "unsupported",
+  "prompt": "Draft the game",
+  "document": "# Game",
+  "history": [],
+  "references": []
+}
+
+### Guests receive 401
+POST {{baseUrl}}/api/gdd-assistant
+Content-Type: application/json
+
+{
+  "checkpoint": "concept",
+  "prompt": "Draft the game",
+  "document": "# Game",
+  "history": [],
+  "references": []
+}

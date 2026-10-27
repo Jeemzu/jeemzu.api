@@ -33,6 +33,19 @@ Username and password remain the sign-in credentials. Registration also collects
 
 ## Endpoints
 
+### GDD assistant - `/api/gdd-assistant`
+
+`POST` requires a JWT. Returns `200` with `Cache-Control: no-store`; it creates no server-side document and does not approve changes.
+
+- Request: `{ checkpoint, prompt, document, history, references }`. Checkpoints: `concept`, `gameplay`, `world`, `presentation`, `technical`, `release`.
+- `prompt`: 1–4,000 characters; `document`: 1–100,000 characters, including the current draft and any pending proposal; `history`: up to 12 `{ role: "user" | "assistant", content }` turns, each up to 8,000 characters and 32,000 combined.
+- References: up to 12 `{ name, text, url, imageBase64 }` objects; names up to 200 characters, text up to 20,000 each / 60,000 combined, HTTP(S) URL up to 2,000, and base64 JPEG up to 256 KiB decoded. Empty text/URL/image strings are allowed. At most four images per request. Links are never fetched; no remote image URLs or arbitrary model IDs are accepted.
+- Response: `{ message, questions, referenceRequests, proposal: { title, introduction, sections: [{ title, items: [{ heading, body }] }] } }`. Only current-checkpoint sections may be proposed; cover fields are reserved for `concept`. Proposed text replaces text in listed sections only after client-side approval; image categories and other sections are preserved. Markdown body headings and image markup are rejected.
+- Limits: 2 MiB request, 12 requests per account per five minutes, 90-second deadline, 10,000 output tokens, no automatic retries at the workflow level. Model configuration: `OpenAI:GddModel` (default `gpt-6-luna`), independent from `OpenAI:ChatModel`.
+- Credentials: GDD requests use only `OpenAI:GddApiKey` (`OpenAI__GddApiKey` in Render), separate from the profile chatbot/embedding `OpenAI:ApiKey`. A missing or blank GDD key disables only the assistant with `503`; there is no fallback to the chatbot key. Set the key as a server secret and restart/redeploy; never put it in frontend variables or source control.
+- Errors: `400` invalid input, `401` invalid session, `413` oversized request, `429` account request limit, `502` provider failure/refusal/invalid proposal, `503` missing dedicated key, `504` timeout. Handled completion errors return ProblemDetails without changing the draft.
+- Checkpoint prompts, recent history, references and pending proposals persist inside optional `draft.assistant` version-1 editor metadata. Existing account saves store the ZIP unchanged under the same quota; no database migration is needed. Provider access and output quality require a separate live smoke check.
+
 ### GDD library - `/api/gdd-documents`
 
 All routes require a JWT and resolve ownership from the authenticated username. Another user's document returns `404`. Responses use `Cache-Control: no-store`.
@@ -498,7 +511,8 @@ Returned by the summary endpoint.
 | `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                       |
 | `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                                     |
 | `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                              |
-| `OpenAI__ApiKey`                       | Chat completions and embeddings                                                |
+| `OpenAI__ApiKey`                       | Profile chatbot completions and embeddings                                     |
+| `OpenAI__GddApiKey`                    | Dedicated GDD assistant key; missing/blank disables only GDD AI (`503`)          |
 | `Agents__BaseUrl`                      | Private-network address of the Python agents service                           |
 | `InternalApiKey`                       | Shared secret the agents service sends as `X-Internal-Key`                     |
 | `Resend__ApiKey`                       | Enables contact, verification, and password reset email                        |

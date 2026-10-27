@@ -53,13 +53,17 @@ services:
       - key: Rag__TopK
         value: "5"
       - key: OpenAI__ChatModel
-        value: gpt-4o-mini
+        value: gpt-6-luna
+      - key: OpenAI__GddModel
+        value: gpt-6-luna
       - key: OpenAI__EmbeddingModel
         value: text-embedding-3-small
 
       - key: Jwt__Secret
         sync: false
       - key: OpenAI__ApiKey
+        sync: false
+      - key: OpenAI__GddApiKey
         sync: false
       - key: InternalApiKey
         sync: false
