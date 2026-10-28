@@ -1,4 +1,5 @@
 using JeemzuApi.Data;
+using JeemzuApi.Putt;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -187,16 +188,21 @@ builder.Services.AddAuthorization();
 builder.Services.AddHealthChecks()
     .AddNpgSql(connectionString);
 
-// CORS — allow the Netlify frontend and the local Vite dev server
+// Better Putt Party: built-in courses, live rooms and the 20 Hz tick loop (WebSocket at /api/putt/ws)
+builder.Services.AddPuttParty();
+
+// CORS — allow the Netlify frontend and the local Vite dev server (also enforced for WebSockets)
+string[] frontendOrigins =
+[
+    "https://jeemzu.me",
+    "https://www.jeemzu.me",
+    "http://localhost:5173",  // Vite default port
+];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("JeemzuFrontend", policy =>
     {
-        policy.WithOrigins(
-                "https://jeemzu.me",
-                "https://www.jeemzu.me",
-                "http://localhost:5173"  // Vite default port
-            )
+        policy.WithOrigins(frontendOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();   // Required for httpOnly refresh token cookie
@@ -240,6 +246,9 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("JeemzuFrontend");
+var webSocketOptions = new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) };
+foreach (var origin in frontendOrigins) webSocketOptions.AllowedOrigins.Add(origin);
+app.UseWebSockets(webSocketOptions);
 app.UseAuthentication();
 // After authentication so the "account-user" policy can partition by username.
 app.UseRateLimiter();
@@ -249,5 +258,6 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+app.MapPuttParty();
 
 app.Run();
