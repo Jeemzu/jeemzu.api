@@ -5,6 +5,9 @@ namespace JeemzuApi.DTOs;
 /// <summary>A bounded, stateless request for one GDD checkpoint.</summary>
 public sealed record GddAssistantRequest
 {
+    /// <summary>Scratch builds a new design; fill expands or revises an existing GDD.</summary>
+    [RegularExpression("scratch|fill")]
+    public string Mode { get; init; } = "scratch";
     [Required, StringLength(40)]
     public required string Checkpoint { get; init; }
     [Required, StringLength(4000)]
@@ -32,7 +35,7 @@ public sealed record GddAssistantReference(
 /// <summary>A proposed subsection; body contains Markdown without headings or images.</summary>
 public sealed record GddAssistantItem(string Heading, string Body);
 
-/// <summary>A complete replacement for the text in one checkpoint-owned section.</summary>
+/// <summary>Section text in scratch mode; subsection additions/replacements by heading in fill mode.</summary>
 public sealed record GddAssistantSection(string Title, GddAssistantItem[] Items);
 
 /// <summary>Proposed text only; the user must approve it before changing the editor.</summary>

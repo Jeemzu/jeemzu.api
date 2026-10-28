@@ -25,6 +25,8 @@ public sealed class GddAssistantService(
 
     public static string? ValidateRequest(GddAssistantRequest request)
     {
+        if (request.Mode is not ("scratch" or "fill"))
+            return "Select a supported GDD assistant mode: scratch or fill.";
         if (!Checkpoints.ContainsKey(request.Checkpoint))
             return "Select a supported GDD checkpoint.";
         if (request.History.Any(message => message is null) || request.References.Any(reference => reference is null))
@@ -74,6 +76,7 @@ public sealed class GddAssistantService(
         return proposal.Sections.All(section =>
             section is not null && allowed.Contains(section.Title) &&
             section.Items is { Length: > 0 and <= 12 } &&
+            section.Items.Select(item => item?.Heading).Distinct().Count() == section.Items.Length &&
             section.Items.All(item => item is not null && Line(item.Heading, 100) &&
                 Text(item.Body, 12000) &&
                 !Regex.IsMatch(item.Body, @"(?m)^\s{0,3}#{1,6}\s|!\[|<\s*img\b", RegexOptions.IgnoreCase)));
@@ -81,9 +84,25 @@ public sealed class GddAssistantService(
 
     public async Task<GddAssistantResponse> CompleteAsync(GddAssistantRequest request, CancellationToken ct)
     {
+        var modeInstructions = request.Mode == "fill"
+            ? """
+              Mode: fill in the blanks of an existing GDD. The user may choose any checkpoint.
+              Identify missing or underdeveloped details in this checkpoint using the current GDD and missingDetails.
+              Build on existing decisions rather than restarting the design. Ask focused questions where needed.
+              You may propose expansions or revisions to existing text, but preserve supplied facts and intent.
+              Each proposed item ADDS a new subsection or REPLACES only the text with the exact same Heading
+              in that section. Reuse existing headings exactly for revisions and blank fields.
+              Omitted subsections and sections are preserved. Propose only items needing changes.
+              """
+            : """
+              Mode: start from scratch. Guide the user through the checkpoints in order.
+              Each proposed section REPLACES its existing text in full: preserve existing details unless the user
+              requests revisions. Unchanged sections may be omitted.
+              """;
         var history = new ChatHistory();
         history.AddSystemMessage($"""
             You are an iterative game design collaborator. Work ONLY on checkpoint "{request.Checkpoint}".
+            {modeInstructions}
             Return JSON matching the supplied response schema. Never apply or approve anything yourself.
             Ask at most three focused questions if decisions are missing; request optional, targeted references
             appropriate to this checkpoint. The user may decline references. Do not invent supplied facts,
@@ -93,8 +112,7 @@ public sealed class GddAssistantService(
             Ground proposals in the user's prompt, existing document and previous decisions.
             Clearly label unresolved decisions and assumptions in proposed text.
             Only propose sections titled: {string.Join(", ", Checkpoints[request.Checkpoint])}.
-            Each proposed section REPLACES its existing text in full: preserve existing details unless the user
-            requests revisions. Unchanged sections may be omitted. Never include image Markdown or HTML.
+            Never include image Markdown or HTML. Use unique subsection headings within each proposed section.
             Put subsection headings in Heading and Markdown paragraphs/lists/tables in Body, without headings.
             Only concept may propose Title (max 100 characters) and Introduction (max 2000); otherwise use empty strings.
             Message max 4000 characters; Questions and ReferenceRequests at most 5 strings, each max 500.

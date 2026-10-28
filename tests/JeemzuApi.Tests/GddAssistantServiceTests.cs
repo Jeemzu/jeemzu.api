@@ -23,6 +23,26 @@ public sealed class GddAssistantServiceTests
         new("Test game", "A tiny game.", [new("Game direction", [new("Vision", "Explore a quiet world.")])]));
 
     [Theory]
+    [InlineData("scratch", "Each proposed section REPLACES")]
+    [InlineData("fill", "Each proposed item ADDS")]
+    public async Task SendsModeSpecificProposalInstructions(string mode, string expectedInstruction)
+    {
+        using var handler = new CompletionHandler(JsonSerializer.Serialize(Response()));
+        using var http = new HttpClient(handler);
+        var service = new GddAssistantService(new OpenAIChatCompletionService("gpt-6-luna", "test-key", httpClient: http));
+        await service.CompleteAsync(Request() with { Mode = mode }, CancellationToken.None);
+        using var wire = JsonDocument.Parse(handler.Body!);
+        var system = wire.RootElement.GetProperty("messages")[0].GetProperty("content").GetString();
+        Assert.Contains(expectedInstruction, system);
+        if (mode == "fill")
+        {
+            Assert.Contains("missingDetails", system);
+            Assert.Contains("Omitted subsections and sections are preserved", system);
+            Assert.DoesNotContain("Each proposed section REPLACES", system);
+        }
+    }
+
+    [Theory]
     [InlineData("gpt-6-luna", true)]
     [InlineData("gpt-4o-mini", false)]
     public async Task SendsBoundedStructuredMultimodalRequestsWithTheConfiguredModel(string model, bool noReasoning)
@@ -96,6 +116,9 @@ public sealed class GddAssistantServiceTests
     [Fact]
     public void RejectsUnsupportedCheckpointsAndOversizedReferences()
     {
+        Assert.Equal("scratch", Request().Mode);
+        Assert.NotNull(GddAssistantService.ValidateRequest(Request() with { Mode = "unknown" }));
+        Assert.Null(GddAssistantService.ValidateRequest(Request() with { Mode = "fill" }));
         Assert.NotNull(GddAssistantService.ValidateRequest(Request() with { Checkpoint = "unknown" }));
         Assert.NotNull(GddAssistantService.ValidateRequest(Request() with
         {
@@ -115,6 +138,10 @@ public sealed class GddAssistantServiceTests
     {
         Assert.True(GddAssistantService.ValidResponse(Response(), "concept"));
         Assert.False(GddAssistantService.ValidResponse(Response(), "gameplay"));
+        Assert.False(GddAssistantService.ValidResponse(Response() with
+        {
+            Proposal = new("Game", "", [new("Game direction", [new("Vision", "First."), new("Vision", "Second.")])]),
+        }, "concept"));
         Assert.False(GddAssistantService.ValidResponse(Response() with
         {
             Proposal = new("Game", "", [new("Game direction", [new("Vision", "## Bad heading")])]),

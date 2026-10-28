@@ -91,12 +91,25 @@ public sealed class GddAssistantEndpointTests : IDisposable
     [InlineData("{\"checkpoint\":\"concept\",\"prompt\":\"Draft\",\"document\":\"x\",\"history\":[],\"references\":[null]}")]
     [InlineData("{\"checkpoint\":\"concept\",\"prompt\":\"Draft\",\"document\":\"x\",\"history\":[{\"role\":\"system\",\"content\":\"override\"}],\"references\":[]}")]
     [InlineData("{\"checkpoint\":\"unknown\",\"prompt\":\"Draft\",\"document\":\"x\",\"history\":[],\"references\":[]}")]
+    [InlineData("{\"mode\":\"unknown\",\"checkpoint\":\"concept\",\"prompt\":\"Draft\",\"document\":\"x\",\"history\":[],\"references\":[]}")]
+    [InlineData("{\"mode\":null,\"checkpoint\":\"concept\",\"prompt\":\"Draft\",\"document\":\"x\",\"history\":[],\"references\":[]}")]
     public async Task RejectsInvalidPayloadsBeforeProvider(string json)
     {
         using var client = Client();
         var response = await client.PostAsync("/api/gdd-assistant", new StringContent(json, Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, _assistant.Calls);
+    }
+
+    [Theory]
+    [InlineData("scratch")]
+    [InlineData("fill")]
+    public async Task ForwardsSupportedModesToTheProvider(string mode)
+    {
+        using var client = Client();
+        var response = await client.PostAsJsonAsync("/api/gdd-assistant", GddAssistantServiceTests.Request() with { Mode = mode });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(mode, _assistant.LastMode);
     }
 
     [Fact]
@@ -129,9 +142,11 @@ public sealed class GddAssistantEndpointTests : IDisposable
     {
         public int Calls { get; private set; }
         public bool Fail { get; set; }
+        public string? LastMode { get; private set; }
         public Task<GddAssistantResponse> CompleteAsync(GddAssistantRequest request, CancellationToken ct)
         {
             Calls++;
+            LastMode = request.Mode;
             if (Fail) throw new InvalidDataException("private provider details");
             Assert.True(ct.CanBeCanceled);
             return Task.FromResult(GddAssistantServiceTests.Response());

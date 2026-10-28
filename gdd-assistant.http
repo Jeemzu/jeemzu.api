@@ -7,6 +7,7 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
+  "mode": "scratch",
   "checkpoint": "concept",
   "prompt": "Help design a small exploration game about restoring an abandoned island.",
   "document": "# Island game",
@@ -14,6 +15,20 @@ Content-Type: application/json
   "references": [
     { "name": "Design constraints", "text": "Solo developer; one island; Windows first.", "url": "", "imageBase64": "" }
   ]
+}
+
+### Fill missing gameplay details in an existing GDD (any checkpoint may be selected)
+POST {{baseUrl}}/api/gdd-assistant
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "mode": "fill",
+  "checkpoint": "gameplay",
+  "prompt": "Help fill the missing supporting systems without changing my core loop.",
+  "document": "{\"currentGdd\":\"# Island game\\n\\n## Core gameplay\\n\\n### Core loop\\n\\nExplore, restore habitats, unlock paths.\",\"missingDetails\":[{\"section\":\"Core gameplay\",\"headings\":[\"Supporting systems\"]}],\"pendingProposal\":null}",
+  "history": [],
+  "references": []
 }
 
 ### Invalid checkpoint returns 400 without calling the model
