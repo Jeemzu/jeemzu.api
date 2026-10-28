@@ -12,6 +12,42 @@ namespace JeemzuApi.Tests;
 
 public sealed class GddAssistantServiceTests
 {
+    [Fact]
+    public void ValidatesConsolidatedNotesAndImagePlacements()
+    {
+        var image = new GddAssistantImage(Guid.NewGuid().ToString(), "Game direction", "Mood", "Quiet island");
+        var response = Response() with
+        {
+            Unresolved = ["Team size", "Target browsers"],
+            Proposal = Response().Proposal with { Images = [image] },
+        };
+        Assert.True(GddAssistantService.ValidResponse(response, "concept"));
+        Assert.False(GddAssistantService.ValidResponse(response with { Unresolved = [new string('x', 1001)] }, "concept"));
+        Assert.False(GddAssistantService.ValidResponse(response with
+        {
+            Proposal = response.Proposal with { Images = [image with { Section = "Audience and release" }] },
+        }, "concept"));
+        Assert.False(GddAssistantService.ValidResponse(response with
+        {
+            Proposal = response.Proposal with { Images = [image, image] },
+        }, "concept"));
+    }
+
+    [Fact]
+    public async Task RejectsInventedImageIdsAndAcceptsUploadedReferences()
+    {
+        var id = Guid.NewGuid().ToString();
+        var response = Response() with
+        {
+            Proposal = Response().Proposal with { Images = [new(id, "Game direction", "Mood", "Quiet island")] },
+        };
+        using var http = new HttpClient(new CompletionHandler(JsonSerializer.Serialize(response)));
+        var service = new GddAssistantService(new OpenAIChatCompletionService("gpt-6-luna", "test-key", httpClient: http));
+        await Assert.ThrowsAsync<InvalidDataException>(() => service.CompleteAsync(Request(), CancellationToken.None));
+        var request = Request() with { References = [new("Mood", "", "", "", id, "images/reference.jpg")] };
+        Assert.Null(GddAssistantService.ValidateRequest(request));
+        Assert.Single((await service.CompleteAsync(request, CancellationToken.None)).Proposal.Images);
+    }
     public static GddAssistantRequest Request() => new()
     {
         Checkpoint = "concept", Prompt = "A small exploration game.", Document = "# Game",

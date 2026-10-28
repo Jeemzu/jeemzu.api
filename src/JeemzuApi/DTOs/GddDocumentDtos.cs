@@ -2,13 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace JeemzuApi.DTOs;
 
-/// <summary>A generated PDF and the ZIP needed to resume editing it.</summary>
+/// <summary>An editable draft ZIP and an optional current PDF.</summary>
 public sealed record SaveGddDocumentRequest
 {
     [Required, StringLength(100, MinimumLength = 1)]
     public string Title { get; init; } = string.Empty;
-    [Required]
-    public IFormFile Pdf { get; init; } = null!;
+    public IFormFile? Pdf { get; init; }
     [Required]
     public IFormFile Draft { get; init; } = null!;
     public Guid? Revision { get; init; }

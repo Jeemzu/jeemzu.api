@@ -30,7 +30,12 @@ public sealed record GddAssistantReference(
     [Required, StringLength(200)] string Name,
     [StringLength(20000)] string Text,
     [StringLength(2000)] string Url,
-    [StringLength(350000)] string ImageBase64);
+    [StringLength(350000)] string ImageBase64,
+    string? Id = null,
+    string? ImagePath = null);
+
+/// <summary>An uploaded reference image proposed for an approved document section.</summary>
+public sealed record GddAssistantImage(string ReferenceId, string Section, string Heading, string Caption);
 
 /// <summary>A proposed subsection; body contains Markdown without headings or images.</summary>
 public sealed record GddAssistantItem(string Heading, string Body);
@@ -39,8 +44,14 @@ public sealed record GddAssistantItem(string Heading, string Body);
 public sealed record GddAssistantSection(string Title, GddAssistantItem[] Items);
 
 /// <summary>Proposed text only; the user must approve it before changing the editor.</summary>
-public sealed record GddAssistantProposal(string Title, string Introduction, GddAssistantSection[] Sections);
+public sealed record GddAssistantProposal(string Title, string Introduction, GddAssistantSection[] Sections)
+{
+    public GddAssistantImage[] Images { get; init; } = [];
+}
 
 /// <summary>Focused guidance and a reviewable proposal for the current checkpoint.</summary>
 public sealed record GddAssistantResponse(
-    string Message, string[] Questions, string[] ReferenceRequests, GddAssistantProposal Proposal);
+    string Message, string[] Questions, string[] ReferenceRequests, GddAssistantProposal Proposal)
+{
+    public string[] Unresolved { get; init; } = [];
+}

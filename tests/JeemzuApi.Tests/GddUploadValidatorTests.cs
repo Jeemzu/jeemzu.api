@@ -33,6 +33,14 @@ public class GddUploadValidatorTests
     public void AcceptsMatchingPdfAndEditableDraft() =>
         Assert.Null(GddUploadValidator.Validate("Game", Pdf, Draft()));
 
+    [Fact]
+    public void AcceptsDraftOnlySavesButStillValidatesTheDraft()
+    {
+        Assert.Null(GddUploadValidator.Validate("Game", [], Draft()));
+        Assert.NotNull(GddUploadValidator.Validate("Other", [], Draft()));
+        Assert.NotNull(GddUploadValidator.Validate("Game", [], "not a zip"u8.ToArray()));
+    }
+
     [Theory]
     [InlineData("../secret.png")]
     [InlineData("/absolute.png")]

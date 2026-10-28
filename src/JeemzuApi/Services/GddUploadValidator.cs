@@ -14,7 +14,7 @@ public static class GddUploadValidator
     {
         if (string.IsNullOrWhiteSpace(title) || title.Length > 100 || title.Any(char.IsControl))
             return "Use a document title between 1 and 100 characters on a single line.";
-        if (pdf.Length < 8 || pdf.Length > PdfLimit || !pdf.AsSpan(0, 5).SequenceEqual("%PDF-"u8))
+        if (pdf.Length != 0 && (pdf.Length < 8 || pdf.Length > PdfLimit || !pdf.AsSpan(0, 5).SequenceEqual("%PDF-"u8)))
             return "Provide a PDF no larger than 20 MB.";
         if (draft.Length == 0 || draft.Length > DraftLimit)
             return "Provide an editable draft ZIP no larger than 25 MB.";

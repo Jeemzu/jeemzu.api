@@ -33,6 +33,22 @@ Content-Type: application/zip
 GET {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}
 Authorization: Bearer {{token}}
 
+### Save unfinished editable progress without a PDF
+POST {{baseUrl}}/api/gdd-documents
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=gdd-boundary
+
+--gdd-boundary
+Content-Disposition: form-data; name="title"
+
+{{title}}
+--gdd-boundary
+Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
+Content-Type: application/zip
+
+< ./game-draft.zip
+--gdd-boundary--
+
 ### Download a consistent PDF/draft pair at the same revision
 GET {{baseUrl}}/api/gdd-documents/{{create.response.body.$.id}}/pdf?revision={{create.response.body.$.revision}}
 Authorization: Bearer {{token}}

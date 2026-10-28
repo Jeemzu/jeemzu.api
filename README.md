@@ -50,7 +50,7 @@ Docker Compose starts PostgreSQL for local development.
 
 ### GDD library - `/api/gdd-documents`
 
-- Authenticated users can store multiple named documents as a generated PDF plus an editable draft ZIP containing original images. Binary data stays in PostgreSQL; no new storage service is required.
+- Authenticated users can store multiple named documents as an editable draft ZIP containing original images, with an optional current PDF. Draft-only saves need no generated PDF; omitting the PDF on update clears stale output (`pdfBytes: 0`, PDF download `404`). Binary data stays in PostgreSQL; this change needs no database migration or new storage service.
 - The account quota is 100 MiB (104,857,600 bytes), counting PDF bytes plus compressed ZIP bytes. Uploads allow a 20 MiB PDF, 25 MiB ZIP, and 46 MiB multipart request. Saves reuse the `account-user` rate limit. Owner-scoped queries, per-account transactional locking, revision checks, and user-deletion cascade protect consistency.
 - Deploy this API before the GDD account-library frontend. Startup applies the `AddGddDocuments` migration; no production migration has been run as part of implementation. Database backups must now include the document binaries.
 - See [API.md](API.md#gdd-library---apigdd-documents) for routes and [gdd-documents.http](gdd-documents.http) for local requests.

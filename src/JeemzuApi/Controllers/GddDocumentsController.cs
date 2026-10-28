@@ -53,7 +53,7 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Draft(Guid id, [FromQuery] Guid revision, CancellationToken ct) => Download(id, revision, true, ct);
 
-    /// <summary>Creates a named GDD if its PDF and draft fit the account's 100 MB quota.</summary>
+    /// <summary>Creates a named editable GDD with an optional PDF within the account's 100 MB quota.</summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(GddUploadValidator.RequestLimit)]
@@ -103,11 +103,11 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
         if (user is null) return Unauthorized();
         if ((!create && (request.Revision is null || request.Revision == Guid.Empty)) || (create && request.Revision is not null))
             return Problem(statusCode: 400, detail: "Updates require the saved revision; new documents must omit it.");
-        if (request.Pdf.Length > GddUploadValidator.PdfLimit || request.Draft.Length > GddUploadValidator.DraftLimit)
+        if (request.Pdf?.Length > GddUploadValidator.PdfLimit || request.Draft.Length > GddUploadValidator.DraftLimit)
             return Problem(statusCode: 413, detail: "PDFs support up to 20 MB and draft ZIPs up to 25 MB.");
         using var pdf = new MemoryStream();
         using var draft = new MemoryStream();
-        await request.Pdf.CopyToAsync(pdf, ct);
+        if (request.Pdf is not null) await request.Pdf.CopyToAsync(pdf, ct);
         await request.Draft.CopyToAsync(draft, ct);
         var pdfBytes = pdf.ToArray();
         var draftBytes = draft.ToArray();
@@ -133,6 +133,7 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
         var file = await documents.GetFileAsync(user.Value, id, draft, ct);
         if (file is null) return NotFound();
         if (file.Revision != revision) return Problem(statusCode: 409, detail: "This document changed elsewhere. Refresh the library and try again.");
+        if (!draft && file.Data.Length == 0) return NotFound();
         var safeTitle = string.Concat(file.Title.Select(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character) ? '-' : character));
         return File(file.Data, draft ? "application/zip" : "application/pdf",
             $"{safeTitle} - {(draft ? "GDD Draft.zip" : "Game Design Document.pdf")}");
