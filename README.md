@@ -135,6 +135,10 @@ No database migration is needed.
 | ------ | ----------------------------- | ---- | ----------------------------------------------- |
 | `GET`  | `/api/knowledge/search?q=...` | None | Vector similarity search against knowledge base |
 
+### Better Putt Party
+
+Moved to the `games-realtime` service in the `games-api` repository (`wss://play.jeemzu.me/v1/games/putt-party/ws`).
+
 ### Health
 
 | Method | Path      | Description                   |

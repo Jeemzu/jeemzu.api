@@ -38,10 +38,6 @@
     <Content Update="Data\about-me.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!-- Built-in Better Putt Party courses; drop a validated hand-off course file here to add it -->
-    <Content Update="Putt\Courses\*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
 </Project>

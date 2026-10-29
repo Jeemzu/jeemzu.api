@@ -1,5 +1,4 @@
 using JeemzuApi.Data;
-using JeemzuApi.Putt;
 using JeemzuApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -188,10 +187,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddHealthChecks()
     .AddNpgSql(connectionString);
 
-// Better Putt Party: built-in courses, live rooms and the 20 Hz tick loop (WebSocket at /api/putt/ws)
-builder.Services.AddPuttParty();
-
-// CORS — allow the Netlify frontend and the local Vite dev server (also enforced for WebSockets)
+// CORS — allow the Netlify frontend and the local Vite dev server
 string[] frontendOrigins =
 [
     "https://jeemzu.me",
@@ -246,9 +242,6 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("JeemzuFrontend");
-var webSocketOptions = new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) };
-foreach (var origin in frontendOrigins) webSocketOptions.AllowedOrigins.Add(origin);
-app.UseWebSockets(webSocketOptions);
 app.UseAuthentication();
 // After authentication so the "account-user" policy can partition by username.
 app.UseRateLimiter();
@@ -258,6 +251,5 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
-app.MapPuttParty();
 
 app.Run();
