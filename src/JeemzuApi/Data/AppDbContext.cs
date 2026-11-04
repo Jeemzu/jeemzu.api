@@ -31,129 +31,131 @@ public class AppDbContext : DbContext
             entity.HasIndex(document => new { document.UserId, document.UpdatedAt });
             entity.HasOne(document => document.User).WithMany()
                 .HasForeignKey(document => document.UserId).OnDelete(DeleteBehavior.Cascade);
-            modelBuilder.Entity<StoredFile>(entity =>
-            {
-                entity.HasKey(f => f.Id);
-                entity.Property(f => f.Name).IsRequired().HasMaxLength(255);
-                entity.Property(f => f.Content).IsRequired().HasColumnType("bytea");
-                entity.HasIndex(f => new { f.UserId, f.CreatedAt });
-                entity.ToTable(t => t.HasCheckConstraint(
-                    "CK_StoredFiles_SizeBytes",
-                    "\"SizeBytes\" = octet_length(\"Content\") AND \"SizeBytes\" BETWEEN 0 AND 26214400"));
-                entity.HasOne(f => f.User)
-                      .WithMany()
-                      .HasForeignKey(f => f.UserId)
-                      .OnDelete(DeleteBehavior.Cascade);
-            });
+        });
 
-            // Ensure the pgvector extension exists in the database.
-            // EF will emit "CREATE EXTENSION IF NOT EXISTS vector" in the migration.
-            modelBuilder.HasPostgresExtension("vector");
+        modelBuilder.Entity<StoredFile>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+            entity.Property(f => f.Name).IsRequired().HasMaxLength(255);
+            entity.Property(f => f.Content).IsRequired().HasColumnType("bytea");
+            entity.HasIndex(f => new { f.UserId, f.CreatedAt });
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_StoredFiles_SizeBytes",
+                "\"SizeBytes\" = octet_length(\"Content\") AND \"SizeBytes\" BETWEEN 0 AND 26214400"));
+            entity.HasOne(f => f.User)
+                  .WithMany()
+                  .HasForeignKey(f => f.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
-            // KnowledgeChunk — stores text chunks with their vector embeddings for RAG retrieval
-            modelBuilder.Entity<KnowledgeChunk>(entity =>
-            {
-                entity.HasKey(k => k.Id);
-                entity.Property(k => k.SourceKey).IsRequired().HasMaxLength(200);
-                entity.Property(k => k.Content).IsRequired();
-                entity.Property(k => k.Embedding).HasColumnType("vector(1536)");
+        // Ensure the pgvector extension exists in the database.
+        // EF will emit "CREATE EXTENSION IF NOT EXISTS vector" in the migration.
+        modelBuilder.HasPostgresExtension("vector");
 
-                // Unique constraint so ingestion can reliably upsert by source key
-                entity.HasIndex(k => k.SourceKey).IsUnique();
+        // KnowledgeChunk — stores text chunks with their vector embeddings for RAG retrieval
+        modelBuilder.Entity<KnowledgeChunk>(entity =>
+        {
+            entity.HasKey(k => k.Id);
+            entity.Property(k => k.SourceKey).IsRequired().HasMaxLength(200);
+            entity.Property(k => k.Content).IsRequired();
+            entity.Property(k => k.Embedding).HasColumnType("vector(1536)");
 
-                // HNSW index for fast approximate cosine similarity search.
-                // m=16 (connections per layer) and ef_construction=64 (build-time search depth)
-                // are sensible defaults for a small-to-medium knowledge base.
-                entity.HasIndex(k => k.Embedding)
-                      .HasMethod("hnsw")
-                      .HasOperators("vector_cosine_ops")
-                      .HasStorageParameter("m", 16)
-                      .HasStorageParameter("ef_construction", 64);
-            });
+            // Unique constraint so ingestion can reliably upsert by source key
+            entity.HasIndex(k => k.SourceKey).IsUnique();
 
-            // Score configuration
-            modelBuilder.Entity<Score>(entity =>
-            {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.GameId).IsRequired().HasMaxLength(100);
-                entity.Property(s => s.Username).IsRequired().HasMaxLength(50);
-                entity.Property(s => s.ScoreValue).IsRequired();
-                // Index for fast leaderboard queries: filter by GameId, order by ScoreValue DESC
-                entity.HasIndex(s => new { s.GameId, s.ScoreValue });
-                // One score per authenticated user per game (NULLs are distinct so guest scores are unaffected)
-                entity.HasIndex(s => new { s.UserId, s.GameId })
-                      .IsUnique()
-                      .HasFilter("\"UserId\" IS NOT NULL");
-                // Optional FK to User — nullable to support guest/legacy scores
-                entity.HasOne(s => s.User)
-                      .WithMany()
-                      .HasForeignKey(s => s.UserId)
-                      .IsRequired(false)
-                      .OnDelete(DeleteBehavior.SetNull);
-            });
+            // HNSW index for fast approximate cosine similarity search.
+            // m=16 (connections per layer) and ef_construction=64 (build-time search depth)
+            // are sensible defaults for a small-to-medium knowledge base.
+            entity.HasIndex(k => k.Embedding)
+                  .HasMethod("hnsw")
+                  .HasOperators("vector_cosine_ops")
+                  .HasStorageParameter("m", 16)
+                  .HasStorageParameter("ef_construction", 64);
+        });
 
-            // User configuration
-            modelBuilder.Entity<User>(entity =>
-            {
-                entity.HasKey(u => u.Id);
-                entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
-                // Unique index so no two players can share a username
-                entity.HasIndex(u => u.Username).IsUnique();
-                entity.Property(u => u.Email).HasMaxLength(256);
-                // Only verified addresses are reserved — an unverified signup can't squat someone else's email
-                entity.HasIndex(u => u.Email)
-                      .IsUnique()
-                      .HasFilter("\"Email\" IS NOT NULL AND \"EmailVerifiedAt\" IS NOT NULL");
-            });
+        // Score configuration
+        modelBuilder.Entity<Score>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.GameId).IsRequired().HasMaxLength(100);
+            entity.Property(s => s.Username).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.ScoreValue).IsRequired();
+            // Index for fast leaderboard queries: filter by GameId, order by ScoreValue DESC
+            entity.HasIndex(s => new { s.GameId, s.ScoreValue });
+            // One score per authenticated user per game (NULLs are distinct so guest scores are unaffected)
+            entity.HasIndex(s => new { s.UserId, s.GameId })
+                  .IsUnique()
+                  .HasFilter("\"UserId\" IS NOT NULL");
+            // Optional FK to User — nullable to support guest/legacy scores
+            entity.HasOne(s => s.User)
+                  .WithMany()
+                  .HasForeignKey(s => s.UserId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
 
-            // UserToken configuration — email verification and password reset
-            modelBuilder.Entity<UserToken>(entity =>
-            {
-                entity.HasKey(t => t.Id);
-                entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(64);
-                entity.Property(t => t.Purpose).IsRequired().HasMaxLength(30);
-                entity.HasIndex(t => new { t.TokenHash, t.Purpose });
-                entity.HasIndex(t => t.UserId);
-                entity.HasOne(t => t.User)
-                      .WithMany()
-                      .HasForeignKey(t => t.UserId)
-                      .OnDelete(DeleteBehavior.Cascade);
-            });
+        // User configuration
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
+            // Unique index so no two players can share a username
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(256);
+            // Only verified addresses are reserved — an unverified signup can't squat someone else's email
+            entity.HasIndex(u => u.Email)
+                  .IsUnique()
+                  .HasFilter("\"Email\" IS NOT NULL AND \"EmailVerifiedAt\" IS NOT NULL");
+        });
 
-            // RefreshToken configuration
-            modelBuilder.Entity<RefreshToken>(entity =>
-            {
-                entity.HasKey(r => r.Id);
-                entity.Property(r => r.Token).IsRequired().HasMaxLength(256);
-                entity.Property(r => r.Username).IsRequired().HasMaxLength(50);
-                entity.HasIndex(r => r.Token).IsUnique();
-            });
+        // UserToken configuration — email verification and password reset
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(t => t.Purpose).IsRequired().HasMaxLength(30);
+            entity.HasIndex(t => new { t.TokenHash, t.Purpose });
+            entity.HasIndex(t => t.UserId);
+            entity.HasOne(t => t.User)
+                  .WithMany()
+                  .HasForeignKey(t => t.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
-            // BudgetSnapshot — one saved budget per user, keyed by the owning user
-            modelBuilder.Entity<BudgetSnapshot>(entity =>
-            {
-                entity.HasKey(b => b.UserId);
-                entity.Property(b => b.DataJson).IsRequired().HasColumnType("jsonb");
-                entity.HasOne(b => b.User)
-                      .WithMany()
-                      .HasForeignKey(b => b.UserId)
-                      .OnDelete(DeleteBehavior.Cascade);
-            });
+        // RefreshToken configuration
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Token).IsRequired().HasMaxLength(256);
+            entity.Property(r => r.Username).IsRequired().HasMaxLength(50);
+            entity.HasIndex(r => r.Token).IsUnique();
+        });
 
-            // BudgetCapabilityGap — assistant requests Budgetize can't model yet
-            modelBuilder.Entity<BudgetCapabilityGap>(entity =>
-            {
-                entity.HasKey(g => g.Id);
-                entity.Property(g => g.RequestText).IsRequired().HasMaxLength(2000);
-                entity.Property(g => g.Reason).IsRequired().HasMaxLength(2000);
-                entity.Property(g => g.SuggestedFeature).IsRequired().HasMaxLength(120);
-                // Admin view ranks by how often the same feature is asked for
-                entity.HasIndex(g => g.SuggestedFeature);
-                entity.HasIndex(g => g.UserId);
-                entity.HasOne(g => g.User)
-                      .WithMany()
-                      .HasForeignKey(g => g.UserId)
-                      .OnDelete(DeleteBehavior.Cascade);
-            });
-        }
+        // BudgetSnapshot — one saved budget per user, keyed by the owning user
+        modelBuilder.Entity<BudgetSnapshot>(entity =>
+        {
+            entity.HasKey(b => b.UserId);
+            entity.Property(b => b.DataJson).IsRequired().HasColumnType("jsonb");
+            entity.HasOne(b => b.User)
+                  .WithMany()
+                  .HasForeignKey(b => b.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // BudgetCapabilityGap — assistant requests Budgetize can't model yet
+        modelBuilder.Entity<BudgetCapabilityGap>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.RequestText).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.Reason).IsRequired().HasMaxLength(2000);
+            entity.Property(g => g.SuggestedFeature).IsRequired().HasMaxLength(120);
+            // Admin view ranks by how often the same feature is asked for
+            entity.HasIndex(g => g.SuggestedFeature);
+            entity.HasIndex(g => g.UserId);
+            entity.HasOne(g => g.User)
+                  .WithMany()
+                  .HasForeignKey(g => g.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
 }
