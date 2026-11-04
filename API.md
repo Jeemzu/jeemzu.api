@@ -51,21 +51,36 @@ Username and password remain the sign-in credentials. Registration also collects
 
 All routes require a JWT and resolve ownership from the authenticated username. Another user's document returns `404`. Responses use `Cache-Control: no-store`.
 
-| Method | Path | Result |
-| ------ | ---- | ------ |
-| `GET` | `/api/gdd-documents` | `200 { documents, usedBytes, limitBytes }` |
-| `GET` | `/api/gdd-documents/{id}` | `200` document metadata |
-| `POST` | `/api/gdd-documents` | Multipart create; `201` metadata and Location |
-| `PUT` | `/api/gdd-documents/{id}` | Multipart replace; `200` metadata with a new revision |
-| `GET` | `/api/gdd-documents/{id}/pdf?revision={revision}` | Download PDF |
-| `GET` | `/api/gdd-documents/{id}/draft?revision={revision}` | Download editable ZIP and original images |
-| `DELETE` | `/api/gdd-documents/{id}?revision={revision}` | `204`, releasing storage |
+| Method   | Path                                                | Result                                                |
+| -------- | --------------------------------------------------- | ----------------------------------------------------- |
+| `GET`    | `/api/gdd-documents`                                | `200 { documents, usedBytes, limitBytes }`            |
+| `GET`    | `/api/gdd-documents/{id}`                           | `200` document metadata                               |
+| `POST`   | `/api/gdd-documents`                                | Multipart create; `201` metadata and Location         |
+| `PUT`    | `/api/gdd-documents/{id}`                           | Multipart replace; `200` metadata with a new revision |
+| `GET`    | `/api/gdd-documents/{id}/pdf?revision={revision}`   | Download PDF                                          |
+| `GET`    | `/api/gdd-documents/{id}/draft?revision={revision}` | Download editable ZIP and original images             |
+| `DELETE` | `/api/gdd-documents/{id}?revision={revision}`       | `204`, releasing storage                              |
 
 - Metadata: `id` and `revision` UUIDs, `title`, `pdfBytes`, `draftBytes`, `createdAt`, and `updatedAt` (UTC timestamps). Listing does not load binaries.
 - Save fields: `title` (1-100 characters, single line), `pdf` (optional file), `draft` (required file), and `revision` (required on update, omitted on create). The ZIP must contain version-1 `jeemzu-gdd-editor` metadata whose game title matches `title`. Omit `pdf` to save unfinished progress; `pdfBytes` is then zero and the PDF download returns `404`. Omitting the PDF on update clears any previous PDF so stale output cannot be downloaded as current. When a PDF exists, download both files using the same revision to restore a consistent editable document.
 - Storage: 100 MiB per account, including PDFs and compressed draft ZIPs. PDF maximum: 20 MiB; ZIP: 25 MiB; complete multipart request: 46 MiB. Updates subtract the replaced version before charging the new bytes. ZIP validation also bounds paths, types, entries, and expanded sizes.
 - Errors: `400` invalid upload/revision, `401` invalid session, `404` missing/foreign document, `409` stale revision, `413` file/account limit, `429` account-user rate limit (shared 10 requests per 5 minutes). Validation, conflict, and quota responses include ProblemDetails `detail`. A quota race cannot allow simultaneous uploads to exceed the account limit.
 - Deleting an account cascade-deletes its documents. There is no automatic upload, PDF-only import, or version history; updates replace the PDF and editable ZIP together.
+
+### Private Admin Files — `/api/admin/files`
+
+Requires an Admin JWT and an account that is still an admin in the database. All operations are scoped to that account; another account's file ID returns `404`.
+
+| Method   | Path                    | Success | Request / response                                                                 |
+| -------- | ----------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `GET`    | `/api/admin/files`      | `200`   | Array of `{ id, name, sizeBytes, createdAt }`, newest first; no content            |
+| `POST`   | `/api/admin/files`      | `201`   | `multipart/form-data` field `file`; returns metadata and a `Location` download URL |
+| `GET`    | `/api/admin/files/{id}` | `200`   | Binary attachment, `application/octet-stream`, original filename                   |
+| `DELETE` | `/api/admin/files/{id}` | `204`   | Permanently removes the file                                                       |
+
+Any file type is allowed, including empty files, up to 25 MB (26,214,400 bytes). Names must have 1-255 characters without control characters; path components are stripped. Duplicate names create separate files. Invalid uploads return `400`; oversized requests may return `413` or multipart validation `400`. Missing authentication returns `401`; non-admin access returns `403`. Downloads are private and non-cacheable; access tokens must never be placed in URLs.
+
+See [admin-files.http](admin-files.http) for manual requests and the [storage notes](README.md#private-admin-files--apiadminfiles) for deployment and database capacity considerations.
 
 ### Auth — `/api/auth`
 
@@ -517,24 +532,24 @@ Returned by the summary endpoint.
 
 ## Environment variables (Render)
 
-| Variable                               | Purpose                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------ |
-| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string, in Npgsql keyword form (not a `postgres://` URI) |
-| `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                       |
-| `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                                     |
-| `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                              |
-| `OpenAI__ApiKey`                       | Profile chatbot completions and embeddings                                     |
+| Variable                               | Purpose                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string, in Npgsql keyword form (not a `postgres://` URI)   |
+| `Jwt__Secret`                          | HMAC-SHA256 signing key (256-bit random)                                         |
+| `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                                       |
+| `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                                |
+| `OpenAI__ApiKey`                       | Profile chatbot completions and embeddings                                       |
 | `OpenAI__GddApiKey`                    | Dedicated GDD assistant key; missing/blank disables only GDD AI (`503`)          |
 | `OpenAI__BudgetApiKey`                 | Dedicated native Budgetize key; missing/blank disables only Budgetize AI (`503`) |
-| `OpenAI__BudgetModel`                  | Model for every Budgetize stage (default `gpt-6-luna`)                         |
-| `InternalApiKey`                       | Existing knowledge-search `X-Internal-Key` contract (not used by Budgetize)     |
-| `Resend__ApiKey`                       | Enables contact, verification, and password reset email                        |
-| `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)                  |
-| `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`)       |
-| `Seed__AdminUsername`                  | One-time admin bootstrap; the seeder no-ops once the user exists               |
-| `Seed__AdminEmail`                     | Email for the seeded admin account                                             |
-| `Seed__AdminPassword`                  | Temporary password; unset means no seeding, and there is no default            |
-| `PORT`                                 | Port the container listens on (`8080`)                                         |
+| `OpenAI__BudgetModel`                  | Model for every Budgetize stage (default `gpt-6-luna`)                           |
+| `InternalApiKey`                       | Existing knowledge-search `X-Internal-Key` contract (not used by Budgetize)      |
+| `Resend__ApiKey`                       | Enables contact, verification, and password reset email                          |
+| `Resend__AccountFrom`                  | From address for account email (falls back to `Resend__From`)                    |
+| `Frontend__BaseUrl`                    | Base URL for verification and reset links (default: `https://jeemzu.me`)         |
+| `Seed__AdminUsername`                  | One-time admin bootstrap; the seeder no-ops once the user exists                 |
+| `Seed__AdminEmail`                     | Email for the seeded admin account                                               |
+| `Seed__AdminPassword`                  | Temporary password; unset means no seeding, and there is no default              |
+| `PORT`                                 | Port the container listens on (`8080`)                                           |
 
 ---
 

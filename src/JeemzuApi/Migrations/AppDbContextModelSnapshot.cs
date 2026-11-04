@@ -241,6 +241,40 @@ namespace JeemzuApi.Migrations
                     b.ToTable("Scores");
                 });
 
+            modelBuilder.Entity("JeemzuApi.Models.StoredFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("StoredFiles", t =>
+                        {
+                            t.HasCheckConstraint("CK_StoredFiles_SizeBytes", "\"SizeBytes\" = octet_length(\"Content\") AND \"SizeBytes\" BETWEEN 0 AND 26214400");
+                        });
+                });
+
             modelBuilder.Entity("JeemzuApi.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -366,6 +400,17 @@ namespace JeemzuApi.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JeemzuApi.Models.StoredFile", b =>
+                {
+                    b.HasOne("JeemzuApi.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

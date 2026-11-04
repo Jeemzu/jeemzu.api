@@ -129,6 +129,24 @@ No database migration is needed.
 | `GET`  | `/api/admin/users`            | Admin | List all users                                                       |
 | `PUT`  | `/api/admin/users/{id}/role`  | Admin | Update user role                                                     |
 
+### Private Admin Files — `/api/admin/files`
+
+| Method | Path                    | Auth  | Description |
+| ------ | ----------------------- | ----- | ----------- |
+| `GET` | `/api/admin/files` | Admin | List only the caller's file metadata |
+| `POST` | `/api/admin/files` | Admin | Upload multipart field `file`, any file type, up to 25 MB |
+| `GET` | `/api/admin/files/{id}` | Admin | Download an owned file as an attachment |
+| `DELETE` | `/api/admin/files/{id}` | Admin | Delete an owned file |
+
+Files are stored as PostgreSQL `bytea` in `StoredFiles`; the `AddStoredFiles` migration is applied on API startup. No Render disk or new environment variables are needed. Deploy the API before the frontend file panel.
+
+- The limit is 26,214,400 bytes per file, enforced by the API and a database check constraint. Empty files and duplicate names are allowed; each upload gets a unique ID.
+- Ownership uses the existing user's database ID. Only the uploading account, while it remains an admin, can list, download, or delete its files. Account deletion cascades to its files.
+- Listings do not load file contents. Downloads use `application/octet-stream`, attachment disposition, `nosniff`, and no-store caching.
+- Storage consumes the existing database capacity and increases backup size. The panel reports the caller's file bytes, not total database usage or remaining capacity. Monitor the shared 5 GB allocation in Render and leave room for site data, indexes, and database overhead.
+- Deletion makes PostgreSQL space reusable; it does not necessarily shrink the on-disk database immediately.
+- Example requests are in [admin-files.http](admin-files.http); requests must be run manually with a local admin access token.
+
 ### Knowledge — `/api/knowledge`
 
 | Method | Path                          | Auth | Description                                     |
