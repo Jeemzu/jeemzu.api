@@ -33,6 +33,21 @@ Username and password remain the sign-in credentials. Registration also collects
 
 ## Endpoints
 
+### Private Admin Files — `/api/admin/files`
+
+Requires an Admin JWT and an account that is still an admin in the database. All operations are scoped to that account; another account's file ID returns `404`.
+
+| Method | Path | Success | Request / response |
+| ------ | ---- | ------- | ------------------ |
+| `GET` | `/api/admin/files` | `200` | Array of `{ id, name, sizeBytes, createdAt }`, newest first; no content |
+| `POST` | `/api/admin/files` | `201` | `multipart/form-data` field `file`; returns metadata and a `Location` download URL |
+| `GET` | `/api/admin/files/{id}` | `200` | Binary attachment, `application/octet-stream`, original filename |
+| `DELETE` | `/api/admin/files/{id}` | `204` | Permanently removes the file |
+
+Any file type is allowed, including empty files, up to 25 MB (26,214,400 bytes). Names must have 1-255 characters without control characters; path components are stripped. Duplicate names create separate files. Invalid uploads return `400`; oversized requests may return `413` or multipart validation `400`. Missing authentication returns `401`; non-admin access returns `403`. Downloads are private and non-cacheable; access tokens must never be placed in URLs.
+
+See [admin-files.http](admin-files.http) for manual requests and the [storage notes](README.md#private-admin-files--apiadminfiles) for deployment and database capacity considerations.
+
 ### Auth — `/api/auth`
 
 #### `POST /api/auth/refresh`

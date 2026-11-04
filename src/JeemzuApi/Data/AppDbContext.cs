@@ -15,10 +15,26 @@ public class AppDbContext : DbContext
     public DbSet<KnowledgeChunk> KnowledgeChunks => Set<KnowledgeChunk>();
     public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
     public DbSet<BudgetCapabilityGap> BudgetCapabilityGaps => Set<BudgetCapabilityGap>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<StoredFile>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+            entity.Property(f => f.Name).IsRequired().HasMaxLength(255);
+            entity.Property(f => f.Content).IsRequired().HasColumnType("bytea");
+            entity.HasIndex(f => new { f.UserId, f.CreatedAt });
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_StoredFiles_SizeBytes",
+                "\"SizeBytes\" = octet_length(\"Content\") AND \"SizeBytes\" BETWEEN 0 AND 26214400"));
+            entity.HasOne(f => f.User)
+                  .WithMany()
+                  .HasForeignKey(f => f.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
         // Ensure the pgvector extension exists in the database.
         // EF will emit "CREATE EXTENSION IF NOT EXISTS vector" in the migration.

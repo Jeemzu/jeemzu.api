@@ -60,6 +60,7 @@ builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 
 // Resend email service — used by POST /api/contact and the account verification/reset emails.
 // Key is optional at startup; EmailService will return 503 if unconfigured.

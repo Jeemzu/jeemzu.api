@@ -1,0 +1,35 @@
+@baseUrl = http://localhost:5050
+# Set locally from your admin login response; never commit a real token.
+@accessToken = REPLACE_WITH_ADMIN_ACCESS_TOKEN
+@fileId = 00000000-0000-0000-0000-000000000000
+
+### List this admin account's files
+GET {{baseUrl}}/api/admin/files
+Authorization: Bearer {{accessToken}}
+
+### Upload a small text file; copy the returned id into fileId above
+POST {{baseUrl}}/api/admin/files
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=admin-file-boundary
+
+--admin-file-boundary
+Content-Disposition: form-data; name="file"; filename="example.txt"
+Content-Type: application/octet-stream
+
+Example private file.
+--admin-file-boundary--
+
+### Download an owned file
+GET {{baseUrl}}/api/admin/files/{{fileId}}
+Authorization: Bearer {{accessToken}}
+
+### Delete an owned file
+DELETE {{baseUrl}}/api/admin/files/{{fileId}}
+Authorization: Bearer {{accessToken}}
+
+### Nonexistent file returns 404
+GET {{baseUrl}}/api/admin/files/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{accessToken}}
+
+### Unauthenticated listing returns 401
+GET {{baseUrl}}/api/admin/files
