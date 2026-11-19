@@ -1,17 +1,18 @@
+name: jeemzuapi
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: jeemzu_postgres
     environment:
       POSTGRES_USER: jeemzu
       POSTGRES_PASSWORD: jeemzu_dev_password
       POSTGRES_DB: jeemzu_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:15432:5432"
     volumes:
       - jeemzu_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U jeemzu -d jeemzu_db" ]
+      test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-U", "jeemzu", "-d", "jeemzu_db" ]
       interval: 5s
       timeout: 5s
       retries: 5

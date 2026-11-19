@@ -16,7 +16,7 @@ ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles l
 | Containerization | Docker multi-stage (runtime: port 8080)                              |
 | Hosting          | Render (Docker web service)                                          |
 | Database (prod)  | Render Managed PostgreSQL 16 + pgvector                              |
-| Database (dev)   | Docker Compose (`pgvector/pgvector:pg16`, port 5432)                 |
+| Database (dev)   | Docker Compose (`pgvector/pgvector:pg16`, host port 15432)           |
 | CI/CD            | Render auto-deploy from `main` (see `render.yaml`)                   |
 
 ## Third-Party Services
@@ -248,18 +248,18 @@ All business services are **scoped**. AI services (`Kernel`, `IChatCompletionSer
 ### 1. Start the database
 
 ```bash
-docker compose up -d
+docker compose up -d --wait postgres
 ```
 
 Starts:
 
-- PostgreSQL 16 on port **5432** (`jeemzu` / `jeemzu_dev_password` / `jeemzu_db`)
+- PostgreSQL 16 at **127.0.0.1:15432** (`jeemzu` / `jeemzu_dev_password` / `jeemzu_db`). The `jeemzuapi` Compose project reuses the existing database volume.
 
 ### 2. Configure secrets
 
 ```bash
 cd src/JeemzuApi
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=jeemzu_db;Username=jeemzu;Password=jeemzu_dev_password"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=127.0.0.1;Port=15432;Database=jeemzu_db;Username=jeemzu;Password=jeemzu_dev_password"
 dotnet user-secrets set "Jwt:Secret" "<256-bit-key>"
 dotnet user-secrets set "Jwt:Issuer" "jeemzu-api"
 dotnet user-secrets set "Jwt:Audience" "jeemzu-frontend"
@@ -272,8 +272,11 @@ dotnet user-secrets set "Resend:ApiKey" "<your-key>"
 dotnet user-secrets set "Resend:AccountFrom" "Jeemzu <no-reply@your-verified-domain>"
 ```
 
-Verification and reset links point at `Frontend:BaseUrl` (`http://localhost:5173` in Development,
-`https://jeemzu.me` otherwise). Without `Resend:ApiKey` registration still succeeds — the email is
+If upgrading an existing local setup, update the host and port in your connection-string secret.
+
+Verification and reset links point at `Frontend:BaseUrl` (`http://localhost:5173` for standalone
+Development, `http://localhost:5174` from the frontend workspace, `https://jeemzu.me` otherwise).
+Without `Resend:ApiKey` registration still succeeds — the email is
 skipped and logged, so the address stays unverified and can't be used for password recovery.
 
 #### Reset a local admin password without email
@@ -281,7 +284,7 @@ skipped and logged, so the address stays unverified and can't be used for passwo
 In an interactive PowerShell terminal, select the local Docker database and run:
 
 ```powershell
-$env:ConnectionStrings__DefaultConnection = 'Host=::1;Port=5432;Database=jeemzu_db;Username=jeemzu;Password=jeemzu_dev_password'
+$env:ConnectionStrings__DefaultConnection = 'Host=127.0.0.1;Port=15432;Database=jeemzu_db;Username=jeemzu;Password=jeemzu_dev_password'
 dotnet run --project C:\dev\jeemzu.api\src\JeemzuApi --configuration Debug --no-launch-profile -- --reset-local-admin-password jeemzu
 ```
 
@@ -290,8 +293,7 @@ loopback connection to `jeemzu_db` and an existing Admin account. It uses the
 application's BCrypt work factor, verifies the persisted password, revokes refresh
 sessions and outstanding password-reset links, and exits without starting the API,
 running migrations, sending email, or seeding data. Existing access JWTs remain
-valid until expiry. The IPv6 host avoids the competing IPv4 PostgreSQL listener
-on this development machine. Debug output is separate from the running Release
+valid until expiry. Debug output is separate from the running Release
 API; stop a running Debug API first if it locks the build output.
 
 ### 3. Run the API

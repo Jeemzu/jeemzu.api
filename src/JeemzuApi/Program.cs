@@ -195,6 +195,11 @@ string[] frontendOrigins =
     "https://www.jeemzu.me",
     "http://localhost:5173",  // Vite default port
 ];
+if (builder.Environment.IsDevelopment() && builder.Configuration["Frontend:BaseUrl"] is { } developmentFrontend)
+{
+    frontendOrigins = [.. frontendOrigins, developmentFrontend.TrimEnd('/')];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("JeemzuFrontend", policy =>
