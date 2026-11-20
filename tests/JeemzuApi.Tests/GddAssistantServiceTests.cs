@@ -58,6 +58,53 @@ public sealed class GddAssistantServiceTests
         "Review the concept.", ["What should the player feel?"], ["Optional mood board."],
         new("Test game", "A tiny game.", [new("Game direction", [new("Vision", "Explore a quiet world.")])]));
 
+    [Fact]
+    public void ValidatesGuidedQuestionsAndCompleteDocumentProposals()
+    {
+        var request = new GddGuidedAssistantRequest
+        {
+            Action = "clarify",
+            Prompt = "A quiet exploration game.",
+            Document = "",
+            History = [],
+            References = [],
+        };
+        var question = new GddGuidedAssistantResponse(
+            "One decision will shape the game.",
+            [new("How should exploration feel?", ["Slow and contemplative.", "Fast and dangerous."])],
+            false,
+            null);
+        Assert.Null(GddAssistantService.ValidateGuidedRequest(request));
+        Assert.True(GddAssistantService.ValidGuidedResponse(question, "clarify", request));
+        Assert.False(GddAssistantService.ValidGuidedResponse(
+            question with { Questions = [new("How?", ["Only one option."])] },
+            "clarify",
+            request));
+
+        var proposal = new GddGuidedAssistantResponse(
+            "Here is the complete GDD.",
+            [],
+            true,
+            new("Test game", "A focused game.", [
+                new("Game direction", [new("Vision", "Explore a quiet world.")]),
+                new("First playable", [new("Scope", "One island and one objective.")]),
+            ]));
+        Assert.True(GddAssistantService.ValidGuidedResponse(
+            proposal,
+            "draft",
+            request with { Action = "draft" }));
+        Assert.False(GddAssistantService.ValidGuidedResponse(
+            proposal with
+            {
+                Proposal = proposal.Proposal! with
+                {
+                    Sections = [new("Game direction", [new("Vision", "## Nested heading")])],
+                },
+            },
+            "draft",
+            request with { Action = "draft" }));
+    }
+
     [Theory]
     [InlineData("scratch", "Each proposed section REPLACES")]
     [InlineData("fill", "Each proposed item ADDS")]

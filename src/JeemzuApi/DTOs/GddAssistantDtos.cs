@@ -20,6 +20,21 @@ public sealed record GddAssistantRequest
     public required GddAssistantReference[] References { get; init; }
 }
 
+/// <summary>A bounded conversation request for the complete GDD assistant.</summary>
+public sealed record GddGuidedAssistantRequest
+{
+    [Required, RegularExpression("clarify|draft")]
+    public required string Action { get; init; }
+    [Required, StringLength(4000)]
+    public required string Prompt { get; init; }
+    [Required, StringLength(100000)]
+    public required string Document { get; init; }
+    [Required, MaxLength(30)]
+    public required GddAssistantMessage[] History { get; init; }
+    [Required, MaxLength(12)]
+    public required GddAssistantReference[] References { get; init; }
+}
+
 /// <summary>A previous user or assistant turn at the current checkpoint.</summary>
 public sealed record GddAssistantMessage(
     [Required, RegularExpression("user|assistant")] string Role,
@@ -55,3 +70,11 @@ public sealed record GddAssistantResponse(
 {
     public string[] Unresolved { get; init; } = [];
 }
+
+public sealed record GddGuidedAssistantQuestion(string Question, string[] Suggestions);
+
+public sealed record GddGuidedAssistantResponse(
+    string Message,
+    GddGuidedAssistantQuestion[] Questions,
+    bool ReadyForDraft,
+    GddAssistantProposal? Proposal);

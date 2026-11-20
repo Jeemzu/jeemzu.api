@@ -113,6 +113,24 @@ public sealed class GddAssistantEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task GuidesClarificationThroughTheAuthenticatedEndpoint()
+    {
+        using var client = Client();
+        var request = new GddGuidedAssistantRequest
+        {
+            Action = "clarify",
+            Prompt = "A small exploration game.",
+            Document = "Current draft",
+            History = [],
+            References = [],
+        };
+        var response = await client.PostAsJsonAsync("/api/gdd-assistant/guided", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal("clarify", _assistant.LastMode);
+    }
+
+    [Fact]
     public async Task ReturnsSafeProblemDetailsForProviderFailure()
     {
         _assistant.Fail = true;
@@ -150,6 +168,21 @@ public sealed class GddAssistantEndpointTests : IDisposable
             if (Fail) throw new InvalidDataException("private provider details");
             Assert.True(ct.CanBeCanceled);
             return Task.FromResult(GddAssistantServiceTests.Response());
+        }
+
+        public Task<GddGuidedAssistantResponse> CompleteGuidedAsync(
+            GddGuidedAssistantRequest request,
+            CancellationToken ct)
+        {
+            Calls++;
+            LastMode = request.Action;
+            if (Fail) throw new InvalidDataException("private provider details");
+            Assert.True(ct.CanBeCanceled);
+            return Task.FromResult(new GddGuidedAssistantResponse(
+                "Ready to draft.",
+                [],
+                true,
+                null));
         }
     }
 

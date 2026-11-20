@@ -11,4 +11,7 @@ public sealed class UnconfiguredGddAssistantService : IGddAssistantService
 {
     public Task<GddAssistantResponse> CompleteAsync(GddAssistantRequest request, CancellationToken ct) =>
         throw new GddAssistantUnavailableException();
+
+    public Task<GddGuidedAssistantResponse> CompleteGuidedAsync(GddGuidedAssistantRequest request, CancellationToken ct) =>
+        throw new GddAssistantUnavailableException();
 }
