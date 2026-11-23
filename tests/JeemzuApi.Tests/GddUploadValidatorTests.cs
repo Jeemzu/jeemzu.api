@@ -29,9 +29,50 @@ public class GddUploadValidatorTests
         return output.ToArray();
     }
 
+    private static byte[] CompressedProject(string title = "Game")
+    {
+        var project = JsonSerializer.Serialize(new
+        {
+            format = "jeemzu-gdd-canvas",
+            version = 1,
+            blocks = new
+            {
+                orderMode = "spatial",
+                blocks = new[]
+                {
+                    new
+                    {
+                        subjectId = "game-title-description",
+                        fields = new { title },
+                    },
+                },
+            },
+            assets = new { },
+        });
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, true))
+        using (var writer = new StreamWriter(gzip, new UTF8Encoding(false), 1024, true))
+            writer.Write(project);
+        return output.ToArray();
+    }
+
     [Fact]
     public void AcceptsMatchingPdfAndEditableDraft() =>
         Assert.Null(GddUploadValidator.Validate("Game", Pdf, Draft()));
+
+    [Fact]
+    public void AcceptsCompressedProjectJsonAndRetainsLegacyZipSupport()
+    {
+        Assert.Null(GddUploadValidator.Validate("Game", [], CompressedProject()));
+        Assert.Null(GddUploadValidator.Validate("Game", [], Draft()));
+    }
+
+    [Fact]
+    public void RejectsCompressedProjectWithMismatchedTitleOrInvalidJson()
+    {
+        Assert.NotNull(GddUploadValidator.Validate("Other", [], CompressedProject()));
+        Assert.NotNull(GddUploadValidator.Validate("Game", [], "not gzip"u8.ToArray()));
+    }
 
     [Fact]
     public void AcceptsDraftOnlySavesButStillValidatesTheDraft()

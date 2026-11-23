@@ -44,9 +44,9 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Pdf(Guid id, [FromQuery] Guid revision, CancellationToken ct) => Download(id, revision, false, ct);
 
-    /// <summary>Downloads the editable ZIP for an exact saved revision.</summary>
+    /// <summary>Downloads the compressed project or legacy ZIP for an exact saved revision.</summary>
     [HttpGet("{id:guid}/draft")]
-    [Produces("application/zip", "application/problem+json")]
+    [Produces("application/gzip", "application/zip", "application/problem+json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -104,7 +104,7 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
         if ((!create && (request.Revision is null || request.Revision == Guid.Empty)) || (create && request.Revision is not null))
             return Problem(statusCode: 400, detail: "Updates require the saved revision; new documents must omit it.");
         if (request.Pdf?.Length > GddUploadValidator.PdfLimit || request.Draft.Length > GddUploadValidator.DraftLimit)
-            return Problem(statusCode: 413, detail: "PDFs support up to 20 MB and draft ZIPs up to 25 MB.");
+            return Problem(statusCode: 413, detail: "PDFs support up to 20 MB and compressed GDD projects up to 50 MB.");
         using var pdf = new MemoryStream();
         using var draft = new MemoryStream();
         if (request.Pdf is not null) await request.Pdf.CopyToAsync(pdf, ct);
@@ -135,8 +135,13 @@ public sealed class GddDocumentsController(IGddDocumentService documents) : Cont
         if (file.Revision != revision) return Problem(statusCode: 409, detail: "This document changed elsewhere. Refresh the library and try again.");
         if (!draft && file.Data.Length == 0) return NotFound();
         var safeTitle = string.Concat(file.Title.Select(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character) ? '-' : character));
-        return File(file.Data, draft ? "application/zip" : "application/pdf",
-            $"{safeTitle} - {(draft ? "GDD Draft.zip" : "Game Design Document.pdf")}");
+        if (draft)
+        {
+            var compressed = file.Data.Length >= 2 && file.Data[0] == 0x1f && file.Data[1] == 0x8b;
+            return File(file.Data, compressed ? "application/gzip" : "application/zip",
+                $"{safeTitle} - {(compressed ? "GDD Project.json.gz" : "GDD Draft.zip")}");
+        }
+        return File(file.Data, "application/pdf", $"{safeTitle} - Game Design Document.pdf");
     }
 
     private Task<Guid?> UserId(CancellationToken ct)

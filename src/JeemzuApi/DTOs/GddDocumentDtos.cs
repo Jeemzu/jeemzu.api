@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace JeemzuApi.DTOs;
 
-/// <summary>An editable draft ZIP and an optional current PDF.</summary>
+/// <summary>A compressed GDD project and an optional current PDF.</summary>
 public sealed record SaveGddDocumentRequest
 {
     [Required, StringLength(100, MinimumLength = 1)]

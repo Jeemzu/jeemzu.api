@@ -58,14 +58,14 @@ All routes require a JWT and resolve ownership from the authenticated username. 
 | `POST`   | `/api/gdd-documents`                                | Multipart create; `201` metadata and Location         |
 | `PUT`    | `/api/gdd-documents/{id}`                           | Multipart replace; `200` metadata with a new revision |
 | `GET`    | `/api/gdd-documents/{id}/pdf?revision={revision}`   | Download PDF                                          |
-| `GET`    | `/api/gdd-documents/{id}/draft?revision={revision}` | Download editable ZIP and original images             |
+| `GET`    | `/api/gdd-documents/{id}/draft?revision={revision}` | Download compressed project JSON or a legacy ZIP     |
 | `DELETE` | `/api/gdd-documents/{id}?revision={revision}`       | `204`, releasing storage                              |
 
 - Metadata: `id` and `revision` UUIDs, `title`, `pdfBytes`, `draftBytes`, `createdAt`, and `updatedAt` (UTC timestamps). Listing does not load binaries.
-- Save fields: `title` (1-100 characters, single line), `pdf` (optional file), `draft` (required file), and `revision` (required on update, omitted on create). The ZIP must contain version-1 `jeemzu-gdd-editor` metadata whose game title matches `title`. Omit `pdf` to save unfinished progress; `pdfBytes` is then zero and the PDF download returns `404`. Omitting the PDF on update clears any previous PDF so stale output cannot be downloaded as current. When a PDF exists, download both files using the same revision to restore a consistent editable document.
-- Storage: 100 MiB per account, including PDFs and compressed draft ZIPs. PDF maximum: 20 MiB; ZIP: 25 MiB; complete multipart request: 46 MiB. Updates subtract the replaced version before charging the new bytes. ZIP validation also bounds paths, types, entries, and expanded sizes.
+- Save fields: `title` (1-100 characters, single line), `pdf` (optional file), `draft` (required file), and `revision` (required on update, omitted on create). New drafts are gzip-compressed version-1 `jeemzu-gdd-canvas` JSON whose game title matches `title`. Existing version-1 `jeemzu-gdd-editor` ZIP drafts remain accepted for compatibility and are returned unchanged by the draft download endpoint. Omit `pdf` to save unfinished progress; `pdfBytes` is then zero and the PDF download returns `404`. Omitting the PDF on update clears any previous PDF so stale output cannot be downloaded as current. When a PDF exists, download both files using the same revision to restore a consistent editable document.
+- Storage: 100 MiB per account, including PDFs and compressed project files. PDF maximum: 20 MiB; compressed project maximum: 50 MiB; expanded project maximum: 60 MiB; complete multipart request: 71 MiB. Updates subtract the replaced version before charging the new bytes. Gzip and legacy ZIP content are validated before storage.
 - Errors: `400` invalid upload/revision, `401` invalid session, `404` missing/foreign document, `409` stale revision, `413` file/account limit, `429` account-user rate limit (shared 10 requests per 5 minutes). Validation, conflict, and quota responses include ProblemDetails `detail`. A quota race cannot allow simultaneous uploads to exceed the account limit.
-- Deleting an account cascade-deletes its documents. There is no automatic upload, PDF-only import, or version history; updates replace the PDF and editable ZIP together.
+- Deleting an account cascade-deletes its documents. There is no automatic upload, PDF-only import, or version history; updates replace the PDF and project file together.
 
 ### Private Admin Files — `/api/admin/files`
 

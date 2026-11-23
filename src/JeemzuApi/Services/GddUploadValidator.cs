@@ -7,7 +7,8 @@ public static class GddUploadValidator
 {
     public const long AccountLimit = 100L * 1024 * 1024;
     public const int PdfLimit = 20 * 1024 * 1024;
-    public const int DraftLimit = 25 * 1024 * 1024;
+    public const int DraftLimit = 50 * 1024 * 1024;
+    private const long ExpandedProjectLimit = 60L * 1024 * 1024;
     public const int RequestLimit = PdfLimit + DraftLimit + 1024 * 1024;
 
     public static string? Validate(string title, byte[] pdf, byte[] draft)
@@ -17,7 +18,63 @@ public static class GddUploadValidator
         if (pdf.Length != 0 && (pdf.Length < 8 || pdf.Length > PdfLimit || !pdf.AsSpan(0, 5).SequenceEqual("%PDF-"u8)))
             return "Provide a PDF no larger than 20 MB.";
         if (draft.Length == 0 || draft.Length > DraftLimit)
-            return "Provide an editable draft ZIP no larger than 25 MB.";
+            return "Provide a compressed GDD project no larger than 50 MB.";
+        if (draft.Length >= 2 && draft[0] == 0x1f && draft[1] == 0x8b)
+            return ValidateCompressedProject(title, draft);
+        if (draft.Length >= 2 && draft[0] == (byte)'P' && draft[1] == (byte)'K')
+            return ValidateLegacyZip(title, draft);
+        return "The compressed GDD project or legacy draft ZIP is invalid.";
+    }
+
+    private static string? ValidateCompressedProject(string title, byte[] draft)
+    {
+        try
+        {
+            using var source = new MemoryStream(draft);
+            using var gzip = new GZipStream(source, CompressionMode.Decompress);
+            using var expanded = new MemoryStream();
+            var chunk = new byte[8192];
+            int read;
+            while ((read = gzip.Read(chunk)) != 0)
+            {
+                if (expanded.Length + read > ExpandedProjectLimit)
+                    return "The expanded GDD project exceeds 60 MB.";
+                expanded.Write(chunk, 0, read);
+            }
+            using var json = JsonDocument.Parse(expanded.ToArray());
+            var root = json.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("format", out var format) || format.ValueKind != JsonValueKind.String ||
+                format.GetString() != "jeemzu-gdd-canvas" ||
+                !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number ||
+                !version.TryGetInt32(out var number) || number != 1 ||
+                !root.TryGetProperty("blocks", out var structure) || structure.ValueKind != JsonValueKind.Object ||
+                !structure.TryGetProperty("blocks", out var blocks) || blocks.ValueKind != JsonValueKind.Array)
+                return "The compressed file must contain a supported GDD canvas project.";
+            var storedTitle = blocks.EnumerateArray()
+                .Where(block => block.ValueKind == JsonValueKind.Object &&
+                    block.TryGetProperty("subjectId", out var subject) &&
+                    subject.ValueKind == JsonValueKind.String &&
+                    subject.GetString() == "game-title-description")
+                .Select(block =>
+                    block.TryGetProperty("fields", out var fields) && fields.ValueKind == JsonValueKind.Object &&
+                    fields.TryGetProperty("title", out var value) && value.ValueKind == JsonValueKind.String
+                        ? value.GetString()
+                        : null)
+                .FirstOrDefault();
+            var expectedTitle = string.IsNullOrWhiteSpace(storedTitle) ? "Untitled GDD" : storedTitle.Trim();
+            return expectedTitle == title.Trim()
+                ? null
+                : "The compressed project title must match the document title.";
+        }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException or IOException)
+        {
+            return "The compressed GDD project is invalid or damaged.";
+        }
+    }
+
+    private static string? ValidateLegacyZip(string title, byte[] draft)
+    {
         try
         {
             using var archive = new ZipArchive(new MemoryStream(draft), ZipArchiveMode.Read);

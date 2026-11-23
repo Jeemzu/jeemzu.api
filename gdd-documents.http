@@ -6,8 +6,8 @@
 GET {{baseUrl}}/api/gdd-documents
 Authorization: Bearer {{token}}
 
-### Create: place the matching generated PDF/draft ZIP beside this file locally.
-# Do not commit those personal files. Set title to the form's game title.
+### Create: place a matching compressed canvas project beside this file locally.
+# Do not commit those personal files. Set title to the project's game title.
 # @name create
 POST {{baseUrl}}/api/gdd-documents
 Authorization: Bearer {{token}}
@@ -23,10 +23,10 @@ Content-Type: application/pdf
 
 < ./game.pdf
 --gdd-boundary
-Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
-Content-Type: application/zip
+Content-Disposition: form-data; name="draft"; filename="game-project.json.gz"
+Content-Type: application/gzip
 
-< ./game-draft.zip
+< ./game-project.json.gz
 --gdd-boundary--
 
 ### Read metadata
@@ -43,10 +43,10 @@ Content-Disposition: form-data; name="title"
 
 {{title}}
 --gdd-boundary
-Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
-Content-Type: application/zip
+Content-Disposition: form-data; name="draft"; filename="game-project.json.gz"
+Content-Type: application/gzip
 
-< ./game-draft.zip
+< ./game-project.json.gz
 --gdd-boundary--
 
 ### Download a consistent PDF/draft pair at the same revision
@@ -77,10 +77,10 @@ Content-Type: application/pdf
 
 < ./game.pdf
 --gdd-boundary
-Content-Disposition: form-data; name="draft"; filename="game-draft.zip"
-Content-Type: application/zip
+Content-Disposition: form-data; name="draft"; filename="game-project.json.gz"
+Content-Type: application/gzip
 
-< ./game-draft.zip
+< ./game-project.json.gz
 --gdd-boundary--
 
 ### Delete the updated revision
