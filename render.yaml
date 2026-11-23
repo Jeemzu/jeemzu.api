@@ -47,9 +47,7 @@ services:
         value: jeemzu-frontend
       - key: Rag__TopK
         value: "5"
-      - key: OpenAI__ChatModel
-        value: gpt-6-luna
-      - key: OpenAI__BudgetModel
+      - key: OpenAI__Model
         value: gpt-6-luna
       - key: OpenAI__EmbeddingModel
         value: text-embedding-3-small
@@ -57,8 +55,6 @@ services:
       - key: Jwt__Secret
         sync: false
       - key: OpenAI__ApiKey
-        sync: false
-      - key: OpenAI__BudgetApiKey
         sync: false
       - key: InternalApiKey
         sync: false

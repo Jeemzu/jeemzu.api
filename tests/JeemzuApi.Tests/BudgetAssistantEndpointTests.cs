@@ -65,10 +65,11 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
             }));
     }
 
-    private HttpClient Client(string? username = "designer")
+    private HttpClient Client(string? username = "designer", string? role = "Admin")
     {
         var client = _server.CreateClient();
         if (username is not null) client.DefaultRequestHeaders.Add("X-Test-User", username);
+        if (role is not null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
         return client;
     }
 
@@ -82,6 +83,20 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
             (await client.PostAsJsonAsync("/api/budget/chat", BudgetAssistantServiceTests.Request())).StatusCode);
         Assert.Equal(0, _assistant.Calls);
         if (user is null) Assert.Equal(0, _users.Queries);
+    }
+
+    [Theory]
+    [InlineData("regular-user", "User", 0)]
+    [InlineData("regular-user", null, 0)]
+    [InlineData("demoted-admin", "Admin", 1)]
+    [InlineData("designer", "User", 0)]
+    public async Task DeniesNonAdminsWithoutCallingProvider(string user, string? role, int expectedQueries)
+    {
+        using var client = Client(user, role);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.PostAsJsonAsync("/api/budget/chat", BudgetAssistantServiceTests.Request())).StatusCode);
+        Assert.Equal(0, _assistant.Calls);
+        Assert.Equal(expectedQueries, _users.Queries);
     }
 
     [Fact]
@@ -119,7 +134,7 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         var body = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("private provider details", body);
-        if (status == 503) Assert.Contains("dedicated OpenAI key", body);
+        if (status == 503) Assert.Contains("OpenAI:ApiKey", body);
     }
 
     [Theory]
@@ -158,6 +173,7 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
         var root = json.RootElement;
         var endpoint = root.GetProperty("paths").GetProperty("/api/budget/chat").GetProperty("post");
         Assert.True(endpoint.GetProperty("responses").TryGetProperty("503", out _));
+        Assert.True(endpoint.GetProperty("responses").TryGetProperty("403", out _));
         var schemas = root.GetProperty("components").GetProperty("schemas");
         Assert.True(schemas.GetProperty("BudgetChatResult").GetProperty("properties").TryGetProperty("proposal", out var proposal));
         Assert.Contains("BudgetProposal", proposal.GetRawText());
@@ -210,7 +226,12 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
             foreach (var property in properties) table.Columns.Add(property.Name, Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType);
             if (command.Parameters[0].Value?.ToString() != "deleted-user")
             {
-                var user = new User { Username = command.Parameters[0].Value!.ToString()! };
+                var username = command.Parameters[0].Value!.ToString()!;
+                var user = new User
+                {
+                    Username = username,
+                    Role = username is "regular-user" or "demoted-admin" ? "User" : "Admin",
+                };
                 table.Rows.Add(properties.Select(property => property.GetValue(user) ?? DBNull.Value).ToArray());
             }
             return ValueTask.FromResult(InterceptionResult<DbDataReader>.SuppressWithResult(table.CreateDataReader()));
@@ -224,7 +245,10 @@ public sealed class BudgetAssistantEndpointTests : IDisposable
         {
             var username = Request.Headers["X-Test-User"].ToString();
             if (string.IsNullOrEmpty(username)) return Task.FromResult(AuthenticateResult.NoResult());
-            var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, username)], Scheme.Name);
+            var claims = new List<Claim> { new(ClaimTypes.Name, username) };
+            var role = Request.Headers["X-Test-Role"].ToString();
+            if (!string.IsNullOrEmpty(role)) claims.Add(new Claim(ClaimTypes.Role, role));
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name)));
         }
     }

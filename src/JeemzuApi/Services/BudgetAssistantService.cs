@@ -13,7 +13,7 @@ internal sealed record BudgetAnalystAnswer(string Answer);
 
 public sealed class BudgetAssistantUnavailableException : Exception
 {
-    public BudgetAssistantUnavailableException() : base("The dedicated Budgetize key is not configured.") { }
+    public BudgetAssistantUnavailableException() : base("The shared OpenAI key is not configured.") { }
 }
 
 public sealed class BudgetAssistantBusyException : Exception
@@ -103,10 +103,10 @@ public static class BudgetAssistantRegistration
 {
     public static IServiceCollection AddBudgetAssistant(this IServiceCollection services, IConfiguration configuration)
     {
-        var key = configuration["OpenAI:BudgetApiKey"];
+        var key = configuration["OpenAI:ApiKey"];
         if (string.IsNullOrWhiteSpace(key))
             return services.AddScoped<IBudgetAssistantService, UnconfiguredBudgetAssistantService>();
-        var model = configuration["OpenAI:BudgetModel"] ?? "gpt-6-luna";
+        var model = configuration["OpenAI:Model"] ?? "gpt-6-luna";
         services.AddKeyedSingleton<IChatCompletionService>("budget-assistant", new OpenAIChatCompletionService(model, key));
         services.AddSingleton<BudgetAssistantCapacity>();
         return services.AddScoped<IBudgetAssistantService, BudgetAssistantService>();

@@ -20,7 +20,7 @@ public class ChatService : IChatService
         _embedding = embedding;
         _vectorStore = vectorStore;
         _chat = chat;
-        var model = configuration["OpenAI:ChatModel"] ?? "gpt-6-luna";
+        var model = configuration["OpenAI:Model"] ?? "gpt-6-luna";
         _settings = new OpenAIPromptExecutionSettings
         {
             MaxTokens = 1200,

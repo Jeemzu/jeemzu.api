@@ -138,15 +138,18 @@ public class BudgetController : ControllerBase
     /// <summary>
     /// Asks the assistant about the budget. The budget travels in the request rather
     /// than being read from the database, so unsaved edits are visible; the assistant
-    /// only ever proposes changes, it never writes anything here.
+    /// only ever proposes changes, it never writes anything here. Requires an
+    /// Admin token and a current Admin role on the account.
     /// </summary>
     [HttpPost("chat")]
+    [Authorize(Roles = "Admin")]
     [RequestSizeLimit(2_000_000)]
     [EnableRateLimiting("budget-assistant")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<BudgetChatResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
@@ -156,8 +159,9 @@ public class BudgetController : ControllerBase
         [FromBody] BudgetChatRequest request,
         CancellationToken ct)
     {
-        var userId = await ResolveUserIdAsync(ct);
-        if (userId is null) return Unauthorized();
+        var user = await ResolveUserAsync(ct);
+        if (user is null) return Unauthorized();
+        if (user.Role != "Admin") return Forbid();
 
         var error = BudgetAssistantContext.Validate(request);
         if (error is not null) return Problem(statusCode: 400, detail: error);
@@ -169,8 +173,8 @@ public class BudgetController : ControllerBase
         }
         catch (BudgetAssistantUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Budget assistant dedicated key is not configured.");
-            return Problem(statusCode: 503, detail: "The Budgetize assistant is not configured. Set its dedicated OpenAI key on the server.");
+            _logger.LogWarning(ex, "The shared OpenAI key is not configured.");
+            return Problem(statusCode: 503, detail: "The Budgetize assistant is not configured. Set OpenAI:ApiKey on the server.");
         }
         catch (BudgetAssistantBusyException ex)
         {
@@ -212,11 +216,13 @@ public class BudgetController : ControllerBase
     }
 
     private async Task<Guid?> ResolveUserIdAsync(CancellationToken ct)
+        => (await ResolveUserAsync(ct))?.Id;
+
+    private async Task<User?> ResolveUserAsync(CancellationToken ct)
     {
         var username = User.FindFirstValue(ClaimTypes.Name);
         if (username is null) return null;
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username, ct);
-        return user?.Id;
+        return await _db.Users.FirstOrDefaultAsync(u => u.Username == username, ct);
     }
 }

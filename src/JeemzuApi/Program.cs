@@ -117,12 +117,12 @@ builder.Services.AddBudgetAssistant(builder.Configuration);
 // no per-request state and the underlying HTTP clients are designed to be reused.
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured. Set it via: dotnet user-secrets set \"OpenAI:ApiKey\" \"<key>\"");
-var chatModel = builder.Configuration["OpenAI:ChatModel"] ?? "gpt-6-luna";
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-6-luna";
 var embeddingModel = builder.Configuration["OpenAI:EmbeddingModel"] ?? "text-embedding-3-small";
 
 #pragma warning disable SKEXP0010 // AddOpenAIEmbeddingGenerator is experimental in SK 1.x but stable in practice
 var kernel = Kernel.CreateBuilder()
-    .AddOpenAIChatCompletion(chatModel, openAiApiKey)
+    .AddOpenAIChatCompletion(openAiModel, openAiApiKey)
     .AddOpenAIEmbeddingGenerator(embeddingModel, openAiApiKey)
     .Build();
 #pragma warning restore SKEXP0010

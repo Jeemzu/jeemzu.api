@@ -163,12 +163,12 @@ public class AdminController : ControllerBase
         }
         results.Add(dbStatus);
 
-        var budgetConfigured = !string.IsNullOrWhiteSpace(_configuration["OpenAI:BudgetApiKey"]);
+        var budgetConfigured = !string.IsNullOrWhiteSpace(_configuration["OpenAI:ApiKey"]);
         results.Add(new ServiceHealthStatus
         {
             Service = "Budgetize configuration (not provider availability)",
             Healthy = budgetConfigured,
-            Error = budgetConfigured ? null : "OpenAI:BudgetApiKey is not configured.",
+            Error = budgetConfigured ? null : "OpenAI:ApiKey is not configured.",
         });
 
         return Ok(results);

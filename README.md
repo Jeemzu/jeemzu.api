@@ -25,7 +25,7 @@ ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles a
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Render            | Hosts the ASP.NET Core API at `api.jeemzu.me` and managed PostgreSQL, defined in `render.yaml`. |
 | Render PostgreSQL | Production database for users, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
-| OpenAI            | Supplies completions and embeddings to .NET. Profile and Budgetize keys are configured independently. |
+| OpenAI            | Supplies completions and embeddings to .NET through one shared API key. |
 | Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
 | GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
 
@@ -124,16 +124,17 @@ Files are stored as PostgreSQL `bytea` in `StoredFiles`; the `AddStoredFiles` mi
 
 ## Budgetize Assistant (.NET)
 
-- `POST /api/budget/chat` remains authenticated and stateless: the browser sends its current unsaved budget and authoritative projection.
-- Semantic Kernel runs router → analyst, planner or capability-gap reporter → deterministic proposal validation. Every request makes at most two model calls; all stages use `OpenAI:BudgetModel` (default `gpt-6-luna`).
-- Set `OpenAI:BudgetApiKey` locally with user-secrets, or `OpenAI__BudgetApiKey` on Render's **jeemzu-api** service. Missing/blank returns `503` for Budgetize only; there is no fallback to another key.
+- `POST /api/budget/chat` is admin-only and stateless: the browser sends its current unsaved budget and authoritative projection. Both the token and current database role must be Admin, so demotion blocks existing tokens immediately.
+- Semantic Kernel runs router → analyst, planner or capability-gap reporter → deterministic proposal validation. Every request makes at most two model calls; all stages use GPT-6 Luna.
+- Budgetize and profile chat both use `OpenAI:Model` (default `gpt-6-luna`). Embeddings use the compatible `OpenAI:EmbeddingModel` (default `text-embedding-3-small`).
+- All AI features use the same `OpenAI:ApiKey` locally or `OpenAI__ApiKey` on Render's **jeemzu-api** service.
 - The last six conversation turns and weekly projection (without duplicated daily ledgers) are included. Context is capped at 150,000 characters, output at 500 routing / 2,000 analysis / 6,000 planning / 1,500 gap tokens.
 - Only the existing 11 operations are supported. IDs, dates, recurrence, account ownership, cents and ranges are validated; rejected operations are explained. Nullable operation fields are omitted on the wire so partial updates cannot erase existing values.
 - Nothing is applied server-side. The existing browser projection preview and explicit Apply action remain authoritative; capability gaps still use `POST /api/budget/gaps`.
 - Limits: 12 requests/account/5 minutes, four concurrent workflows/process with no queue, 90-second deadline. Admin health reports local configuration only, not provider availability, without billed probes.
 - No Python runtime, agent service, Tavily integration or database migration is needed. The profile chatbot remains the separate .NET RAG workflow.
 - Offline focused checks: `dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj -c Release --filter FullyQualifiedName~BudgetAssistant`.
-- Manual authenticated request: [budget-assistant.http](budget-assistant.http). Requesting a proposal makes billed provider calls but does not apply or save changes.
+- Manual admin-authenticated request: [budget-assistant.http](budget-assistant.http). Requesting a proposal makes billed provider calls but does not apply or save changes.
 
 ## Database Schema
 
@@ -217,7 +218,6 @@ dotnet user-secrets set "Jwt:Secret" "<256-bit-key>"
 dotnet user-secrets set "Jwt:Issuer" "jeemzu-api"
 dotnet user-secrets set "Jwt:Audience" "jeemzu-frontend"
 dotnet user-secrets set "OpenAI:ApiKey" "<your-key>"
-dotnet user-secrets set "OpenAI:BudgetApiKey" "<your-budget-key>"
 
 # Optional — required only to actually deliver verification / password reset emails
 dotnet user-secrets set "Resend:ApiKey" "<your-key>"
@@ -283,7 +283,7 @@ are never committed.
 
 #### Retiring the former agents service
 
-1. Sync the Blueprint and set **jeemzu-api**'s dedicated `OpenAI__BudgetApiKey`. Check `OpenAI__BudgetModel=gpt-6-luna`; verify model access in the key's OpenAI project.
+1. Sync the Blueprint and set **jeemzu-api**'s `OpenAI__ApiKey`. The shared `OpenAI__Model` is GPT-6 Luna; verify model access in the key's OpenAI project.
 2. Deploy the API. Confirm Budgetize can answer a question and preview/apply a temporary override, and inspect local configuration at `/api/admin/health`.
 3. Manually delete the existing **jeemzu-agents** service in Render after verification. Removing it from the Blueprint does not delete a deployed resource or stop its billing.
 4. Remove stale `Agents__BaseUrl` from the API dashboard if retained. The retired service's `OPENAI_MODEL*`, `OPENAI_API_KEY`, `DOTNET_API_URL` and `TAVILY_API_KEY` no longer configure any current workflow. Revoke its provider credentials when no longer used elsewhere.
@@ -301,9 +301,9 @@ Service env vars:
 
 - `ConnectionStrings__DefaultConnection` — Npgsql keyword form; Render's `postgres://` URI will not parse
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
-- `OpenAI__ApiKey`
-- `OpenAI__BudgetApiKey` — dedicated Budgetize key, with no fallback
-- `OpenAI__BudgetModel`, `OpenAI__ChatModel` — independently configurable, default `gpt-6-luna`
+- `OpenAI__ApiKey` — shared by all AI features
+- `OpenAI__Model` — shared by profile chat and Budgetize (default `gpt-6-luna`)
+- `OpenAI__EmbeddingModel` — embedding model for RAG (default `text-embedding-3-small`)
 - `Resend__ApiKey`, `Resend__AccountFrom` — account verification and password reset email
 - `Frontend__BaseUrl` — base URL used to build verification and reset links
 - `Seed__AdminUsername`, `Seed__AdminEmail`, `Seed__AdminPassword` — one-time admin bootstrap

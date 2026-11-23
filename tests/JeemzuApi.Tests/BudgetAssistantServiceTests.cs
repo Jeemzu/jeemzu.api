@@ -149,23 +149,23 @@ public sealed class BudgetAssistantServiceTests
     }
 
     [Fact]
-    public async Task DedicatedKeyIsRequiredEvenWhenOtherKeysExistAndModelsAreIndependent()
+    public async Task SharedOpenAiKeyAndModelAreUsed()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["OpenAI:ApiKey"] = "profile-test-key",
+            ["OpenAI:BudgetApiKey"] = "obsolete-budget-test-key",
         }).Build();
         var services = new ServiceCollection().AddBudgetAssistant(configuration);
         using var missing = services.BuildServiceProvider();
         await Assert.ThrowsAsync<BudgetAssistantUnavailableException>(() =>
             missing.GetRequiredService<IBudgetAssistantService>().ChatAsync(Request(), CancellationToken.None));
-        configuration["OpenAI:BudgetApiKey"] = "budget-test-key";
+        configuration["OpenAI:ApiKey"] = "shared-test-key";
         using var configured = new ServiceCollection().AddBudgetAssistant(configuration).BuildServiceProvider();
         Assert.IsType<BudgetAssistantService>(configured.GetRequiredService<IBudgetAssistantService>());
         Assert.Equal("gpt-6-luna", configured.GetRequiredKeyedService<IChatCompletionService>("budget-assistant").GetModelId());
-        configuration["OpenAI:BudgetModel"] = "custom-budget-model";
+        configuration["OpenAI:Model"] = "custom-model";
         using var overridden = new ServiceCollection().AddBudgetAssistant(configuration).BuildServiceProvider();
-        Assert.Equal("custom-budget-model", overridden.GetRequiredKeyedService<IChatCompletionService>("budget-assistant").GetModelId());
+        Assert.Equal("custom-model", overridden.GetRequiredKeyedService<IChatCompletionService>("budget-assistant").GetModelId());
     }
 
     [Fact]
