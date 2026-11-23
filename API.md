@@ -1,6 +1,6 @@
 # JeemzuAPI Reference
 
-ASP.NET Core 8 REST API backing [jeemzu.me](https://jeemzu.me). Handles user accounts, authentication, game score submission, and leaderboards for the Jeemzu portfolio site.
+ASP.NET Core 8 REST API backing [jeemzu.me](https://jeemzu.me). Handles user accounts, authentication, and site services.
 
 - **Production base URL:** `https://api.jeemzu.me`
 - **Swagger UI:** `{baseUrl}/swagger`
@@ -130,7 +130,6 @@ Creates a new user account and returns a JWT. Username must be unique. A verific
   "username": "string (required, max 50)",
   "email": "string (required, valid email, max 256)",
   "password": "string (required, min 8, max 100)",
-  "optedIn": true,
   "emailListSubscribed": false
 }
 ```
@@ -190,7 +189,6 @@ Updates the authenticated user's preferences. Username is taken from the JWT —
 
 ```json
 {
-  "optedIn": true,
   "emailListSubscribed": false
 }
 ```
@@ -223,7 +221,7 @@ Same semantics as `POST /api/users`, but returns the full `ProfileResponse`.
 
 #### `POST /api/users/me/username`
 
-Renames the account. Existing scores are renamed in the same transaction, all refresh tokens are revoked, and a fresh token pair is issued.
+Renames the account, revokes refresh tokens, and issues a fresh token pair.
 
 **Auth required:** Yes
 
@@ -329,7 +327,7 @@ Sets a new password using the token from the reset email. Tokens are single-use 
 
 #### `GET /api/users/{username}`
 
-Fetches a user's profile and their personal best score for each game they've played.
+Fetches a user's profile.
 
 **Auth required:** No
 
@@ -338,103 +336,11 @@ Fetches a user's profile and their personal best score for each game they've pla
 ```json
 {
   "userId": "guid",
-  "username": "string",
-  "optedIn": true,
-  "highScores": {
-    "snake": 4200,
-    "tetris": 8800
-  }
+  "username": "string"
 }
 ```
 
 **Response `404`:** User not found.
-
----
-
-### Scores — `/api/scores`
-
-#### `POST /api/scores`
-
-Submits a score for the authenticated user. Username is taken from the JWT — never trusted from the client. Enforces one score per user per game: if a score already exists for this `(user, gameId)` pair, it is updated only if the new score is higher. Lower or equal scores are silently ignored and the existing best is returned.
-
-**Auth required:** Yes — `Authorization: Bearer <token>`
-
-**Request body:**
-
-```json
-{
-  "gameId": "string (required, max 100, e.g. 'snake')",
-  "score": 4200,
-  "timestamp": 1750000000000
-}
-```
-
-`gameId` is normalized to lowercase. `timestamp` is a Unix millisecond value supplied by the client.
-
-**Response `201`:** The stored (or existing best) `ScoreResponse`:
-
-```json
-{
-  "gameId": "snake",
-  "username": "alice",
-  "score": 4200,
-  "timestamp": 1750000000000
-}
-```
-
-**Response `401`:** Missing or invalid token.
-
----
-
-#### `GET /api/scores/{gameId}?limit=10`
-
-Returns the leaderboard for a game — top N scores across all users, sorted descending by score value. `limit` is clamped to 1–100, defaults to 10.
-
-**Auth required:** No
-
-**Response `200`:** Array of `ScoreResponse`:
-
-```json
-[
-  {
-    "gameId": "snake",
-    "username": "alice",
-    "score": 9800,
-    "timestamp": 1750000000000
-  },
-  {
-    "gameId": "snake",
-    "username": "bob",
-    "score": 7200,
-    "timestamp": 1749000000000
-  }
-]
-```
-
----
-
-#### `GET /api/scores/{gameId}/summary`
-
-Returns the all-time record for a game and, if the request is authenticated, the requesting user's personal best. Designed for populating game modal pre-game screens in a single call.
-
-**Auth required:** No (but include Bearer token to get `personalBest`)
-
-**Response `200`:**
-
-```json
-{
-  "allTimeRecord": {
-    "gameId": "snake",
-    "username": "alice",
-    "score": 9800,
-    "timestamp": 1750000000000
-  },
-  "personalBest": 4200
-}
-```
-
-`allTimeRecord` is `null` if no scores exist for the game yet.
-`personalBest` is `null` when unauthenticated or when the user has no score for this game.
 
 ---
 
@@ -460,9 +366,7 @@ Returned by user profile and preference update endpoints.
 ```json
 {
   "userId": "guid",
-  "username": "string",
-  "optedIn": true,
-  "highScores": { "gameId": "bestScore" }
+  "username": "string"
 }
 ```
 
@@ -475,34 +379,9 @@ Returned by the `/api/users/me` endpoints. Only ever served to the account's own
   "username": "string",
   "email": "string | null",
   "emailVerified": false,
-  "optedIn": true,
   "emailListSubscribed": false,
   "role": "User | Admin",
   "createdAt": "2026-01-01T00:00:00Z"
-}
-```
-
-### `ScoreResponse`
-
-Returned by score submission and leaderboard endpoints.
-
-```json
-{
-  "gameId": "string",
-  "username": "string",
-  "score": 0,
-  "timestamp": 0
-}
-```
-
-### `GameSummaryResponse`
-
-Returned by the summary endpoint.
-
-```json
-{
-  "allTimeRecord": "ScoreResponse | null",
-  "personalBest": "number | null"
 }
 ```
 
@@ -512,9 +391,8 @@ Returned by the summary endpoint.
 
 | Table           | Key columns                                                                                                                                                               |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Users`         | `Id` (guid PK), `Username` (unique), `Email` (unique among verified addresses), `EmailVerifiedAt`, `EmailListSubscribed`, `PasswordHash`, `Role`, `OptedIn`               |
+| `Users`         | `Id` (guid PK), `Username` (unique), `Email` (unique among verified addresses), `EmailVerifiedAt`, `EmailListSubscribed`, `PasswordHash`, `Role`                          |
 | `UserTokens`    | `Id` (guid PK), `UserId` (FK → Users, cascade), `TokenHash` (SHA-256 of the emailed token), `Purpose` (`EmailVerification` \| `PasswordReset`), `ExpiresAt`, `ConsumedAt` |
-| `Scores`        | `Id` (guid PK), `GameId`, `Username`, `UserId` (FK → Users, nullable), `ScoreValue`, `Timestamp` — unique index on `(UserId, GameId)` where `UserId IS NOT NULL`          |
 | `RefreshTokens` | `Id`, `Token` (unique), `Username`, `ExpiresAt`, `IsRevoked`                                                                                                              |
 
 ---

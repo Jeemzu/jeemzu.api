@@ -52,22 +52,14 @@ public class AccountService : IAccountService
         if (await _db.Users.AnyAsync(u => u.Username == newUsername))
             throw new InvalidOperationException("USERNAME_TAKEN");
 
-        // Username is denormalised onto gameplay rows, so rename them in the same transaction.
-        await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
             user.Username = newUsername;
             user.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync();
-
-            await _db.Scores.Where(s => s.Username == username)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Username, newUsername));
-
-            await tx.CommitAsync();
         }
         catch (DbUpdateException)
         {
-            await tx.RollbackAsync();
             throw new InvalidOperationException("USERNAME_TAKEN");
         }
 
@@ -175,7 +167,6 @@ public class AccountService : IAccountService
         Username = user.Username,
         Email = user.Email,
         EmailVerified = user.EmailVerifiedAt is not null,
-        OptedIn = user.OptedIn,
         EmailListSubscribed = user.EmailListSubscribed,
         Role = user.Role,
         CreatedAt = user.CreatedAt,

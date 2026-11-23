@@ -85,7 +85,7 @@ public class UsersController : ControllerBase
         return Ok(profile);
     }
 
-    // POST /api/users/me/preferences — leaderboard opt-in and mailing list
+    // POST /api/users/me/preferences — mailing list
     [HttpPost("me/preferences")]
     [Authorize]
     [ProducesResponseType(typeof(ProfileResponse), StatusCodes.Status200OK)]

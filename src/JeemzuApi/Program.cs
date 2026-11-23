@@ -63,7 +63,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, o => o.UseVector()));
 
 // Application services — Scoped so they share the DbContext per request
-builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
@@ -217,8 +216,7 @@ var app = builder.Build();
 
 // Apply pending EF migrations, then seed, so a fresh deploy comes up ready to serve.
 // Render's managed Postgres can refuse the first connection or two while a newly deployed
-// container starts, hence the bounded retry. A retrying EF execution strategy is deliberately
-// NOT used: it forbids the user-initiated transaction in AccountService.ChangeUsernameAsync.
+// container starts, hence the bounded retry.
 using (var scope = app.Services.CreateScope())
 {
     var sp = scope.ServiceProvider;

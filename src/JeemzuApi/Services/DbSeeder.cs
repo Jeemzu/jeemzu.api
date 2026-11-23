@@ -53,7 +53,6 @@ public static class DbSeeder
             // verified ones — so the seeded owner has to start verified or recovery is impossible.
             EmailVerifiedAt = normalizedEmail is null ? null : now,
             Role = "Admin",
-            OptedIn = true,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
             CreatedAt = now,
             UpdatedAt = now,

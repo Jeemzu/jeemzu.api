@@ -4,11 +4,8 @@ public class User
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    /// <summary>Unique display name chosen by the player. Indexed in DB.</summary>
+    /// <summary>Unique display name chosen by the user. Indexed in DB.</summary>
     public string Username { get; set; } = string.Empty;
-
-    /// <summary>Whether the player has opted into global leaderboards.</summary>
-    public bool OptedIn { get; set; }
 
     /// <summary>
     /// Recovery address, stored lower-cased. Null for accounts created before

@@ -4,50 +4,6 @@ using System.Text.Json.Serialization;
 
 namespace JeemzuApi.DTOs;
 
-// ── Scores ──────────────────────────────────────────────────────────────────
-
-/// <summary>
-/// Request body for POST /api/scores.
-/// Username is NOT accepted from the client — it is taken from the authenticated
-/// user's JWT claim to prevent score spoofing.
-/// </summary>
-public class SubmitScoreRequest
-{
-    [Required]
-    [MaxLength(100)]
-    public string GameId { get; set; } = string.Empty;
-
-    [Range(0, int.MaxValue)]
-    public int Score { get; set; }
-
-    /// <summary>Unix timestamp in milliseconds — supplied by the client.</summary>
-    public long Timestamp { get; set; }
-}
-
-/// <summary>
-/// Returned from GET /api/scores/{gameId}.
-/// Must match the TypeScript GameHighScore type:
-///   { gameId: string, username: string, score: number, timestamp: number }
-/// </summary>
-public class ScoreResponse
-{
-    public string GameId { get; set; } = string.Empty;
-    public string Username { get; set; } = string.Empty;
-    public int Score { get; set; }
-    public long Timestamp { get; set; }
-}
-
-/// <summary>
-/// Returned from GET /api/scores/{gameId}/summary.
-/// Provides all-time record and the requesting user's personal best in one call.
-/// PersonalBest is null when the request is unauthenticated.
-/// </summary>
-public class GameSummaryResponse
-{
-    public ScoreResponse? AllTimeRecord { get; set; }
-    public int? PersonalBest { get; set; }
-}
-
 // ── Users ────────────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -56,8 +12,6 @@ public class GameSummaryResponse
 /// </summary>
 public class UpdateUserRequest
 {
-    public bool? OptedIn { get; set; }
-
     /// <summary>Opt in/out of the notification mailing list.</summary>
     public bool? EmailListSubscribed { get; set; }
 }
@@ -79,8 +33,6 @@ public class RegisterRequest
     [MinLength(8)]
     [MaxLength(100)]
     public string Password { get; set; } = string.Empty;
-
-    public bool OptedIn { get; set; }
 
     public bool EmailListSubscribed { get; set; }
 }
@@ -142,7 +94,6 @@ public class ProfileResponse
     public string Username { get; set; } = string.Empty;
     public string? Email { get; set; }
     public bool EmailVerified { get; set; }
-    public bool OptedIn { get; set; }
     public bool EmailListSubscribed { get; set; }
     public string Role { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
@@ -150,20 +101,11 @@ public class ProfileResponse
 
 /// <summary>
 /// Response shape for GET /api/users/{username}.
-/// Must match the TypeScript UserGameData type:
-///   { userId?, username, optedIn, highScores: Record&lt;string, number&gt; }
 /// </summary>
 public class UserResponse
 {
     public string? UserId { get; set; }
     public string Username { get; set; } = string.Empty;
-    public bool OptedIn { get; set; }
-
-    /// <summary>
-    /// Maps gameId → that user's highest score for the game.
-    /// Populated by joining the Scores table on Username.
-    /// </summary>
-    public Dictionary<string, int> HighScores { get; set; } = [];
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -263,7 +205,6 @@ public class AdminUserResponse
     public Guid Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
-    public bool OptedIn { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 

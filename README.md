@@ -1,6 +1,6 @@
 # jeemzu.api
 
-ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles leaderboards, accounts, JWT auth, RAG profile chat, and native GDD/Budgetize AI workflows.
+ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles accounts, JWT auth, RAG profile chat, and native GDD/Budgetize AI workflows.
 
 ## Stack
 
@@ -24,7 +24,7 @@ ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles l
 | Service           | Responsibility                                                                                                                                                                                       |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Render            | Hosts the ASP.NET Core API at `api.jeemzu.me` and managed PostgreSQL, defined in `render.yaml`. |
-| Render PostgreSQL | Production database for users, scores, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
+| Render PostgreSQL | Production database for users, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
 | OpenAI            | Supplies completions and embeddings to .NET. Profile, GDD and Budgetize keys are configured independently. |
 | Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
 | GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
@@ -104,16 +104,11 @@ No database migration is needed.
 | ------ | ----------------------- | ------ | ----------------------------------------------------------- |
 | `POST` | `/api/users/register`   | None   | Creates account → `201 TokenResponse` (sets refresh cookie) |
 | `POST` | `/api/users/login`      | None   | Authenticates → `TokenResponse` (sets refresh cookie)       |
-| `POST` | `/api/users`            | Bearer | Updates `OptedIn` for authenticated user → `UserResponse`   |
-| `GET`  | `/api/users/{username}` | None   | User profile + per-game high scores                         |
+| `POST` | `/api/users`            | Bearer | Updates account preferences → `UserResponse`                |
+| `GET`  | `/api/users/{username}` | None   | User profile                                                 |
 
-### Scores — `/api/scores`
-
-| Method | Path                            | Auth     | Description                                                           |
-| ------ | ------------------------------- | -------- | --------------------------------------------------------------------- |
-| `POST` | `/api/scores`                   | Bearer   | Submit score (upserts — only updates if higher) → `201 ScoreResponse` |
-| `GET`  | `/api/scores/{gameId}?limit=10` | None     | Top-N leaderboard (limit clamped 1–100)                               |
-| `GET`  | `/api/scores/{gameId}/summary`  | Optional | All-time record + personal best (when authenticated)                  |
+The `RemoveGameScores` migration drops the old scores table and leaderboard preference and deletes the obsolete `site_games` knowledge chunk on API startup. Back up the database before deployment; rolling back the migration does not restore deleted data.
+After deploying, re-ingest the knowledge base to refresh the existing project descriptions; ingestion requests embeddings from the provider.
 
 ### Chat — `/api/chat`
 
@@ -153,10 +148,6 @@ Files are stored as PostgreSQL `bytea` in `StoredFiles`; the `AddStoredFiles` mi
 | ------ | ----------------------------- | ---- | ----------------------------------------------- |
 | `GET`  | `/api/knowledge/search?q=...` | None | Vector similarity search against knowledge base |
 
-### Better Putt Party
-
-Moved to the `games-realtime` service in the `games-api` repository (`wss://play.jeemzu.me/v1/games/putt-party/ws`).
-
 ### Health
 
 | Method | Path      | Description                   |
@@ -180,12 +171,7 @@ Moved to the `games-realtime` service in the `games-api` repository (`wss://play
 
 ### Entities
 
-**User** — `Id`, `Username` (unique, max 50), `PasswordHash` (BCrypt), `Role` (`"User"` | `"Admin"`), `OptedIn`, `CreatedAt`, `UpdatedAt`
-
-**Score** — `Id`, `GameId`, `Username`, `UserId` (nullable FK → User, on delete SetNull), `ScoreValue`, `Timestamp` (Unix ms), `CreatedAt`
-
-- Index: `(GameId, ScoreValue)`
-- Unique filtered: `(UserId, GameId) WHERE UserId IS NOT NULL`
+**User** — `Id`, `Username` (unique, max 50), `PasswordHash` (BCrypt), `Role` (`"User"` | `"Admin"`), `CreatedAt`, `UpdatedAt`
 
 **RefreshToken** — `Id`, `Token` (unique, opaque base64), `Username`, `ExpiresAt`, `IsRevoked`, `CreatedAt`
 
@@ -193,12 +179,10 @@ Moved to the `games-realtime` service in the `games-api` repository (`wss://play
 
 ### Migrations
 
-1. `InitialCreate` — Users, Scores
-2. `AddRefreshTokens` — RefreshToken table
-3. `AddUserAuthAndScoreFK` — Score.UserId FK
-4. `AddUserRole` — User.Role column
-5. `AddUniqueScorePerUserPerGame` — Unique score constraint
-6. `AddKnowledgeChunks` — KnowledgeChunk + pgvector
+1. `InitialCreate` — initial account, score, and knowledge tables
+2. `AddGddDocuments` — GDD account storage
+3. `AddStoredFiles` — private admin file storage
+4. `RemoveGameScores` — remove scores, leaderboard preference, and obsolete games knowledge
 
 Migrations auto-apply on startup via `db.Database.Migrate()`.
 
@@ -206,14 +190,14 @@ Migrations auto-apply on startup via `db.Database.Migrate()`.
 
 ```
 src/JeemzuApi/
-├── Controllers/             # Auth, Users, Scores, Chat, Admin, Knowledge
+├── Controllers/             # Auth, Users, Chat, Admin, Knowledge
 ├── Data/
 │   ├── AppDbContext.cs      # EF Core context + fluent config
 │   ├── AppDbContextFactory.cs
 │   └── about-me.json        # RAG knowledge base
 ├── DTOs/
 │   └── Dtos.cs              # All request/response records
-├── Models/                  # User, Score, RefreshToken, KnowledgeChunk
+├── Models/                  # User, RefreshToken, KnowledgeChunk
 ├── Services/                # 7 interface + implementation pairs
 ├── Migrations/              # EF Core migration history
 ├── Program.cs               # DI + middleware pipeline
@@ -229,8 +213,7 @@ Dockerfile                   # .NET API multi-stage build
 | Service              | Responsibility                                                  |
 | -------------------- | --------------------------------------------------------------- |
 | `AuthService`        | JWT issuance, BCrypt hashing, token rotation, cookie management |
-| `ScoreService`       | Score upsert (only if higher), leaderboard queries              |
-| `UserService`        | Profile management, preferences, high score aggregation         |
+| `UserService`        | Profile management and preferences                              |
 | `ChatService`        | RAG pipeline — embed → retrieve → build prompt → LLM            |
 | `EmbeddingService`   | Generate 1536-dim vectors via Semantic Kernel                   |
 | `VectorStoreService` | pgvector cosine similarity queries                              |

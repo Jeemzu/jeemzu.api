@@ -44,7 +44,6 @@ public class AuthService : IAuthService
         {
             Username = request.Username,
             Email = request.Email.Trim().ToLowerInvariant(),
-            OptedIn = request.OptedIn,
             EmailListSubscribed = request.EmailListSubscribed,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
         };

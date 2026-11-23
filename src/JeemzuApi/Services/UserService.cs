@@ -19,16 +19,13 @@ public class UserService : IUserService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username)
             ?? throw new InvalidOperationException($"User '{username}' not found.");
 
-        if (request.OptedIn is bool optedIn)
-            user.OptedIn = optedIn;
-
         if (request.EmailListSubscribed is bool subscribed)
             user.EmailListSubscribed = subscribed;
 
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 
-        return await BuildUserResponseAsync(user);
+        return BuildUserResponse(user);
     }
 
     public async Task<UserResponse?> GetUserAsync(string username)
@@ -38,27 +35,15 @@ public class UserService : IUserService
 
         if (user is null) return null;
 
-        return await BuildUserResponseAsync(user);
+        return BuildUserResponse(user);
     }
 
-    /// <summary>
-    /// Assembles the UserResponse including the highScores dictionary.
-    /// For each game the user has played, picks their single best score.
-    /// </summary>
-    private async Task<UserResponse> BuildUserResponseAsync(User user)
+    private static UserResponse BuildUserResponse(User user)
     {
-        var highScores = await _db.Scores
-            .Where(s => s.Username == user.Username)
-            .GroupBy(s => s.GameId)
-            .Select(g => new { GameId = g.Key, Best = g.Max(s => s.ScoreValue) })
-            .ToDictionaryAsync(x => x.GameId, x => x.Best);
-
         return new UserResponse
         {
             UserId = user.Id.ToString(),
             Username = user.Username,
-            OptedIn = user.OptedIn,
-            HighScores = highScores,
         };
     }
 }

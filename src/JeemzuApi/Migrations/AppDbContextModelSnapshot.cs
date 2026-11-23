@@ -202,45 +202,6 @@ namespace JeemzuApi.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("JeemzuApi.Models.Score", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("GameId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("ScoreValue")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("Timestamp")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameId", "ScoreValue");
-
-                    b.HasIndex("UserId", "GameId")
-                        .IsUnique()
-                        .HasFilter("\"UserId\" IS NOT NULL");
-
-                    b.ToTable("Scores");
-                });
-
             modelBuilder.Entity("JeemzuApi.Models.StoredFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -293,9 +254,6 @@ namespace JeemzuApi.Migrations
 
                     b.Property<DateTimeOffset?>("EmailVerifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("OptedIn")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
@@ -390,16 +348,6 @@ namespace JeemzuApi.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("JeemzuApi.Models.Score", b =>
-                {
-                    b.HasOne("JeemzuApi.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });

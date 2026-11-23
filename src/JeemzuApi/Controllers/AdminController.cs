@@ -69,7 +69,6 @@ public class AdminController : ControllerBase
                 Id = u.Id,
                 Username = u.Username,
                 Role = u.Role,
-                OptedIn = u.OptedIn,
                 CreatedAt = u.CreatedAt,
             })
             .ToListAsync(ct);
@@ -93,7 +92,6 @@ public class AdminController : ControllerBase
             Id = user.Id,
             Username = user.Username,
             Role = user.Role,
-            OptedIn = user.OptedIn,
             CreatedAt = user.CreatedAt,
         });
     }

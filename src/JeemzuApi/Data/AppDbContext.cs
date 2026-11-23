@@ -8,7 +8,6 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<Score> Scores => Set<Score>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -73,33 +72,12 @@ public class AppDbContext : DbContext
                   .HasStorageParameter("ef_construction", 64);
         });
 
-        // Score configuration
-        modelBuilder.Entity<Score>(entity =>
-        {
-            entity.HasKey(s => s.Id);
-            entity.Property(s => s.GameId).IsRequired().HasMaxLength(100);
-            entity.Property(s => s.Username).IsRequired().HasMaxLength(50);
-            entity.Property(s => s.ScoreValue).IsRequired();
-            // Index for fast leaderboard queries: filter by GameId, order by ScoreValue DESC
-            entity.HasIndex(s => new { s.GameId, s.ScoreValue });
-            // One score per authenticated user per game (NULLs are distinct so guest scores are unaffected)
-            entity.HasIndex(s => new { s.UserId, s.GameId })
-                  .IsUnique()
-                  .HasFilter("\"UserId\" IS NOT NULL");
-            // Optional FK to User — nullable to support guest/legacy scores
-            entity.HasOne(s => s.User)
-                  .WithMany()
-                  .HasForeignKey(s => s.UserId)
-                  .IsRequired(false)
-                  .OnDelete(DeleteBehavior.SetNull);
-        });
-
         // User configuration
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(u => u.Id);
             entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
-            // Unique index so no two players can share a username
+            // Unique index so no two users can share a username
             entity.HasIndex(u => u.Username).IsUnique();
             entity.Property(u => u.Email).HasMaxLength(256);
             // Only verified addresses are reserved — an unverified signup can't squat someone else's email
