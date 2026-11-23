@@ -33,40 +33,6 @@ Username and password remain the sign-in credentials. Registration also collects
 
 ## Endpoints
 
-### GDD assistant - `/api/gdd-assistant`
-
-`POST` requires a JWT. Returns `200` with `Cache-Control: no-store`; it creates no server-side document and does not approve changes.
-
-- Request: `{ mode, checkpoint, prompt, document, history, references }`. Mode: `scratch` (default when omitted) or `fill`; other values return `400`. Checkpoints: `concept`, `gameplay`, `world`, `presentation`, `technical`, `release`.
-- `prompt`: 1–4,000 characters; `document`: 1–100,000 characters, including the current draft and any pending proposal; `history`: up to 12 `{ role: "user" | "assistant", content }` turns, each up to 8,000 characters and 32,000 combined.
-- References: up to 12 `{ name, text, url, imageBase64 }` objects; names up to 200 characters, text up to 20,000 each / 60,000 combined, HTTP(S) URL up to 2,000, and base64 JPEG up to 256 KiB decoded. Empty text/URL/image strings are allowed. At most four images per request. Links are never fetched; no remote image URLs or arbitrary model IDs are accepted.
-- Response: `{ message, questions, referenceRequests, unresolved, proposal: { title, introduction, sections: [{ title, items: [{ heading, body }] }], images: [{ referenceId, section, heading, caption }] } }`. `unresolved` contains one consolidated list (up to 30 strings of 1,000 characters), not repeated inline sections. Only current-checkpoint sections may be proposed; cover fields are reserved for `concept`. In `scratch` mode proposed text replaces text in listed sections after client-side approval. In `fill` mode items replace matching subsection headings or append new subsections; omitted items remain unchanged. Subsection headings must be unique within each proposed section. Existing image categories, prototype controls and other sections are preserved. Markdown body headings and image markup are rejected.
-- Image references can additionally supply `id` (UUID) and `imagePath` (`images/<name>.jpg`). These identify already-uploaded local assets, never server-fetched URLs. Proposed images must reference supplied IDs with image paths, use an allowed checkpoint section, and have a heading (100 characters) and caption (400 characters). At most 12 unique image placements may be proposed. Client approval inserts them into the GDD; omitted image arrays and unresolved arrays default to empty for older clients.
-- Limits: 2 MiB request, 12 requests per account per five minutes, 90-second deadline, 10,000 output tokens, no automatic retries at the workflow level. Model configuration: `OpenAI:GddModel` (default `gpt-6-luna`), independent from `OpenAI:ChatModel`.
-- Credentials: GDD requests use only `OpenAI:GddApiKey` (`OpenAI__GddApiKey` in Render), separate from the profile chatbot/embedding `OpenAI:ApiKey`. A missing or blank GDD key disables only the assistant with `503`; there is no fallback to the chatbot key. Set the key as a server secret and restart/redeploy; never put it in frontend variables or source control.
-- Errors: `400` invalid input, `401` invalid session, `413` oversized request, `429` account request limit, `502` provider failure/refusal/invalid proposal, `503` missing dedicated key, `504` timeout. Handled completion errors return ProblemDetails without changing the draft.
-- Mode, checkpoint prompts, recent history, references and pending proposals persist inside optional `draft.assistant` version-1 editor metadata. Legacy workflows without a mode load as `scratch`. Fill mode supports independent checkpoint selection and approvals; scratch mode retains ordered approvals. Existing account saves store the ZIP unchanged under the same quota; no database migration is needed. Provider access and output quality require a separate live smoke check.
-
-### GDD library - `/api/gdd-documents`
-
-All routes require a JWT and resolve ownership from the authenticated username. Another user's document returns `404`. Responses use `Cache-Control: no-store`.
-
-| Method   | Path                                                | Result                                                |
-| -------- | --------------------------------------------------- | ----------------------------------------------------- |
-| `GET`    | `/api/gdd-documents`                                | `200 { documents, usedBytes, limitBytes }`            |
-| `GET`    | `/api/gdd-documents/{id}`                           | `200` document metadata                               |
-| `POST`   | `/api/gdd-documents`                                | Multipart create; `201` metadata and Location         |
-| `PUT`    | `/api/gdd-documents/{id}`                           | Multipart replace; `200` metadata with a new revision |
-| `GET`    | `/api/gdd-documents/{id}/pdf?revision={revision}`   | Download PDF                                          |
-| `GET`    | `/api/gdd-documents/{id}/draft?revision={revision}` | Download compressed project JSON or a legacy ZIP     |
-| `DELETE` | `/api/gdd-documents/{id}?revision={revision}`       | `204`, releasing storage                              |
-
-- Metadata: `id` and `revision` UUIDs, `title`, `pdfBytes`, `draftBytes`, `createdAt`, and `updatedAt` (UTC timestamps). Listing does not load binaries.
-- Save fields: `title` (1-100 characters, single line), `pdf` (optional file), `draft` (required file), and `revision` (required on update, omitted on create). New drafts are gzip-compressed version-1 `jeemzu-gdd-canvas` JSON whose game title matches `title`. Existing version-1 `jeemzu-gdd-editor` ZIP drafts remain accepted for compatibility and are returned unchanged by the draft download endpoint. Omit `pdf` to save unfinished progress; `pdfBytes` is then zero and the PDF download returns `404`. Omitting the PDF on update clears any previous PDF so stale output cannot be downloaded as current. When a PDF exists, download both files using the same revision to restore a consistent editable document.
-- Storage: 100 MiB per account, including PDFs and compressed project files. PDF maximum: 20 MiB; compressed project maximum: 50 MiB; expanded project maximum: 60 MiB; complete multipart request: 71 MiB. Updates subtract the replaced version before charging the new bytes. Gzip and legacy ZIP content are validated before storage.
-- Errors: `400` invalid upload/revision, `401` invalid session, `404` missing/foreign document, `409` stale revision, `413` file/account limit, `429` account-user rate limit (shared 10 requests per 5 minutes). Validation, conflict, and quota responses include ProblemDetails `detail`. A quota race cannot allow simultaneous uploads to exceed the account limit.
-- Deleting an account cascade-deletes its documents. There is no automatic upload, PDF-only import, or version history; updates replace the PDF and project file together.
-
 ### Private Admin Files — `/api/admin/files`
 
 Requires an Admin JWT and an account that is still an admin in the database. All operations are scoped to that account; another account's file ID returns `404`.
@@ -417,7 +383,6 @@ Returned by the `/api/users/me` endpoints. Only ever served to the account's own
 | `Jwt__Issuer`                          | Token issuer claim (default: `jeemzu-api`)                                       |
 | `Jwt__Audience`                        | Token audience claim (default: `jeemzu-frontend`)                                |
 | `OpenAI__ApiKey`                       | Profile chatbot completions and embeddings                                       |
-| `OpenAI__GddApiKey`                    | Dedicated GDD assistant key; missing/blank disables only GDD AI (`503`)          |
 | `OpenAI__BudgetApiKey`                 | Dedicated native Budgetize key; missing/blank disables only Budgetize AI (`503`) |
 | `OpenAI__BudgetModel`                  | Model for every Budgetize stage (default `gpt-6-luna`)                           |
 | `InternalApiKey`                       | Existing knowledge-search `X-Internal-Key` contract (not used by Budgetize)      |

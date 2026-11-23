@@ -49,8 +49,6 @@ services:
         value: "5"
       - key: OpenAI__ChatModel
         value: gpt-6-luna
-      - key: OpenAI__GddModel
-        value: gpt-6-luna
       - key: OpenAI__BudgetModel
         value: gpt-6-luna
       - key: OpenAI__EmbeddingModel
@@ -59,8 +57,6 @@ services:
       - key: Jwt__Secret
         sync: false
       - key: OpenAI__ApiKey
-        sync: false
-      - key: OpenAI__GddApiKey
         sync: false
       - key: OpenAI__BudgetApiKey
         sync: false

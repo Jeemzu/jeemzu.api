@@ -1,6 +1,6 @@
 # jeemzu.api
 
-ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles accounts, JWT auth, RAG profile chat, and native GDD/Budgetize AI workflows.
+ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles accounts, JWT auth, RAG profile chat, and native Budgetize AI workflows.
 
 ## Stack
 
@@ -25,7 +25,7 @@ ASP.NET Core 8 Web API — backend for [jeemzu.me](https://jeemzu.me). Handles a
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Render            | Hosts the ASP.NET Core API at `api.jeemzu.me` and managed PostgreSQL, defined in `render.yaml`. |
 | Render PostgreSQL | Production database for users, refresh tokens, budgets, and knowledge chunks. The `vector` extension supports semantic search over knowledge embeddings.                                     |
-| OpenAI            | Supplies completions and embeddings to .NET. Profile, GDD and Budgetize keys are configured independently. |
+| OpenAI            | Supplies completions and embeddings to .NET. Profile and Budgetize keys are configured independently. |
 | Resend            | Email provider used by `POST /api/contact` and by account email verification / password reset when `Resend:ApiKey` is configured.                                                                    |
 | GitHub Actions    | Dispatches `api-types-update` to the frontend repo so it regenerates OpenAPI types. Render handles building and deploying, so CI does not build images.                                              |
 
@@ -36,38 +36,6 @@ All AI workflows run inside the .NET API; the browser never receives provider ke
 Docker Compose starts PostgreSQL for local development.
 
 ## API Endpoints
-
-### GDD assistant - `/api/gdd-assistant`
-
-- Authenticated, stateless checkpoint collaboration, separate from the profile RAG chatbot. Text and compressed image references go to OpenAI only on an explicit proposal request; URLs are context only, never fetched.
-- Requests accept `mode: "scratch" | "fill"` (omitted means `scratch` for older clients). Scratch proposals replace section text and follow ordered checkpoints. Fill proposals use the existing GDD and blank subsection headings to suggest additions/revisions at any checkpoint; approval replaces matching subsection headings or appends new ones, preserving omitted content. Deploy this API update before the two-mode frontend; no migration is needed.
-- `OpenAI:GddModel`, `OpenAI:ChatModel` and `OpenAI:BudgetModel` independently default to `gpt-6-luna`; Render uses double underscores instead of colons. User-secrets/environment overrides take precedence.
-- GDD completions use the separate `OpenAI:GddApiKey` secret (`OpenAI__GddApiKey` in Render), allowing usage attribution by key. Missing/blank disables only GDD AI with `503`, without falling back to `OpenAI:ApiKey`. Set the local secret with `dotnet user-secrets set "OpenAI:GddApiKey" "<your-gdd-key>" --project src\JeemzuApi`; set the production value in Render, then restart/redeploy. Do not commit the key or expose it through `VITE_` variables.
-- The assistant returns structured, checkpoint-scoped proposals; approval and resumable workflow state live in the GDD project file. No database migration or provider-side conversation/file storage is added. The profile chatbot retains its RAG grounding with a 1,200-token output cap; GDD requests have a 10,000-token cap. GPT-6 models use `reasoning_effort: none` for both workflows.
-- Deploy the API and update model overrides before deploying the assistant UI. Confirm the selected models are available to the deployment's OpenAI project. See [API.md](API.md#gdd-assistant---apigdd-assistant) and [gdd-assistant.http](gdd-assistant.http).
-- Provider-wire and authenticated endpoint tests are offline and need no PostgreSQL or real API key:
-  `dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj --configuration Release --filter FullyQualifiedName~GddAssistant`
-
-### GDD library - `/api/gdd-documents`
-
-- Authenticated users can store multiple named documents as gzip-compressed GDD canvas JSON with embedded images, plus an optional current PDF. Draft-only saves need no generated PDF; omitting the PDF on update clears stale output (`pdfBytes: 0`, PDF download `404`). Existing editable ZIP drafts remain loadable. Binary data stays in PostgreSQL; this change needs no database migration or new storage service.
-- The account quota is 100 MiB (104,857,600 bytes), counting PDF bytes plus compressed project bytes. Uploads allow a 20 MiB PDF, 50 MiB compressed project, 60 MiB expanded project, and 71 MiB multipart request. Saves reuse the `account-user` rate limit. Owner-scoped queries, per-account transactional locking, revision checks, and user-deletion cascade protect consistency.
-- Deploy this API before the GDD account-library frontend. Startup applies the `AddGddDocuments` migration; no production migration has been run as part of implementation. Database backups must now include the document binaries.
-- See [API.md](API.md#gdd-library---apigdd-documents) for routes and [gdd-documents.http](gdd-documents.http) for local requests.
-
-#### Focused GDD tests
-
-Use a disposable local PostgreSQL 16 database with pgvector; never use a production connection.
-
-```powershell
-docker run --rm -d --name jeemzu-gdd-tests -p 127.0.0.1:55439:5432 -e POSTGRES_DB=gdd_test -e POSTGRES_USER=gdd_test -e POSTGRES_PASSWORD=local-test-only pgvector/pgvector:pg16
-# Wait for: docker exec jeemzu-gdd-tests pg_isready -U gdd_test
-$env:GDD_TEST_CONNECTION = 'Host=127.0.0.1;Port=55439;Database=gdd_test;Username=gdd_test;Password=local-test-only'
-dotnet test tests\JeemzuApi.Tests\JeemzuApi.Tests.csproj --configuration Release --filter 'FullyQualifiedName~Gdd'
-docker stop jeemzu-gdd-tests
-```
-
-Tests apply real migrations and exercise multipart endpoints, stored bytes, ownership, revisions, concurrent quota enforcement, and cascade deletion. The test host uses a test-only identity handler; production continues to use JWT authentication.
 
 Budgetize subscriptions are stored in the existing budget `bills` array. The optional
 `isSubscription` boolean on each bill preserves its frontend section assignment;
@@ -183,8 +151,10 @@ Files are stored as PostgreSQL `bytea` in `StoredFiles`; the `AddStoredFiles` mi
 2. `AddGddDocuments` — GDD account storage
 3. `AddStoredFiles` — private admin file storage
 4. `RemoveGameScores` — remove scores, leaderboard preference, and obsolete games knowledge
+5. `RemoveGddDocuments` — remove GDD account storage
 
 Migrations auto-apply on startup via `db.Database.Migrate()`.
+**Back up stored GDD documents before deployment:** `RemoveGddDocuments` permanently deletes them; rolling back recreates an empty table only.
 
 ## Project Structure
 
@@ -248,7 +218,6 @@ dotnet user-secrets set "Jwt:Issuer" "jeemzu-api"
 dotnet user-secrets set "Jwt:Audience" "jeemzu-frontend"
 dotnet user-secrets set "OpenAI:ApiKey" "<your-key>"
 dotnet user-secrets set "OpenAI:BudgetApiKey" "<your-budget-key>"
-dotnet user-secrets set "OpenAI:GddApiKey" "<your-gdd-key>"
 
 # Optional — required only to actually deliver verification / password reset emails
 dotnet user-secrets set "Resend:ApiKey" "<your-key>"
@@ -314,7 +283,7 @@ are never committed.
 
 #### Retiring the former agents service
 
-1. Sync the Blueprint and set **jeemzu-api**'s dedicated `OpenAI__BudgetApiKey` (and `OpenAI__GddApiKey` for GDD). Check `OpenAI__BudgetModel=gpt-6-luna`; verify model access in the key's OpenAI project.
+1. Sync the Blueprint and set **jeemzu-api**'s dedicated `OpenAI__BudgetApiKey`. Check `OpenAI__BudgetModel=gpt-6-luna`; verify model access in the key's OpenAI project.
 2. Deploy the API. Confirm Budgetize can answer a question and preview/apply a temporary override, and inspect local configuration at `/api/admin/health`.
 3. Manually delete the existing **jeemzu-agents** service in Render after verification. Removing it from the Blueprint does not delete a deployed resource or stop its billing.
 4. Remove stale `Agents__BaseUrl` from the API dashboard if retained. The retired service's `OPENAI_MODEL*`, `OPENAI_API_KEY`, `DOTNET_API_URL` and `TAVILY_API_KEY` no longer configure any current workflow. Revoke its provider credentials when no longer used elsewhere.
@@ -333,8 +302,8 @@ Service env vars:
 - `ConnectionStrings__DefaultConnection` — Npgsql keyword form; Render's `postgres://` URI will not parse
 - `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`
 - `OpenAI__ApiKey`
-- `OpenAI__BudgetApiKey`, `OpenAI__GddApiKey` — dedicated keys, with no fallback
-- `OpenAI__BudgetModel`, `OpenAI__GddModel`, `OpenAI__ChatModel` — independently configurable, default `gpt-6-luna`
+- `OpenAI__BudgetApiKey` — dedicated Budgetize key, with no fallback
+- `OpenAI__BudgetModel`, `OpenAI__ChatModel` — independently configurable, default `gpt-6-luna`
 - `Resend__ApiKey`, `Resend__AccountFrom` — account verification and password reset email
 - `Frontend__BaseUrl` — base URL used to build verification and reset links
 - `Seed__AdminUsername`, `Seed__AdminEmail`, `Seed__AdminPassword` — one-time admin bootstrap

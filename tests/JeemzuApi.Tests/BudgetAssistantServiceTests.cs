@@ -153,7 +153,7 @@ public sealed class BudgetAssistantServiceTests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["OpenAI:ApiKey"] = "profile-test-key", ["OpenAI:GddApiKey"] = "gdd-test-key",
+            ["OpenAI:ApiKey"] = "profile-test-key",
         }).Build();
         var services = new ServiceCollection().AddBudgetAssistant(configuration);
         using var missing = services.BuildServiceProvider();
